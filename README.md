@@ -89,29 +89,37 @@ Chi installa l'APK senza ricompilare trova il campo e può incollarlo a mano.
 Gli scope richiesti sono `user-read-playback-state` e `user-read-currently-playing`.
 Non serve il client secret: l'autenticazione usa PKCE.
 
-### App Remote (opzionale, migliora la sincronia)
+### Accesso nativo invece che dal browser
 
-Dove c'e' l'app Spotify sul dispositivo, Squarciagola preferisce leggere lo stato di
-riproduzione da lei invece che dalla Web API: gli aggiornamenti arrivano spinti e in locale,
-quindi non c'e' latenza di rete da compensare ne' polling da tarare. Serve Spotify Premium.
+L'accesso passa dalla libreria di autorizzazione di Spotify: la richiesta di consenso compare
+dentro l'app Spotify installata, e solo in sua assenza si ripiega su una pagina web. Il codice
+torna come risultato dell'attivita', non come redirect nel browser.
 
-Perche' funzioni, sul dashboard di Spotify vanno registrati package e impronta della firma:
-**Edit Settings**, sezione **Android Packages**.
+PKCE resta nostro: la libreria non lo genera, ma accetta parametri liberi, quindi il code
+challenge viaggia con la richiesta. E' cio' che permette di conservare il refresh token, che
+con il flusso a token implicito si perderebbe costringendo a riaccedere ogni ora.
+
+Perche' funzioni vanno registrati package e impronta della firma sul dashboard, in
+**Edit Settings**, sezione **Android Packages**:
 
 | Campo | Valore |
 |---|---|
 | Package name | `it.squarciagola` |
-| SHA-1 (build di debug) | ricavabile con il comando qui sotto |
+| SHA-1 | ricavabile con il comando qui sotto |
 
 ```bash
 keytool -list -v -keystore ~/.android/debug.keystore \
   -alias androiddebugkey -storepass android -keypass android | grep SHA1
 ```
 
-Al primo avvio dopo la registrazione, l'app Spotify chiede l'autorizzazione: va concessa una
-volta. Fino ad allora, e su qualunque dispositivo senza l'app Spotify (i televisori), si usa
-la Web API senza che nulla smetta di funzionare. Quale delle due stia lavorando e' scritto in
-fondo alla schermata, accanto al numero di versione.
+Questo vincola il Client ID alla tua firma: da un'altra app, con lo stesso identificativo,
+l'accesso viene rifiutato.
+
+**App Remote e' stato provato e rimosso.** Prometteva una sincronia migliore, leggendo la
+posizione dall'app Spotify senza rete di mezzo, ma la connessione non si stabiliva mai: prima
+falliva chiedendo un'autorizzazione che non compariva, poi restava appesa senza risposta.
+Costava anche un binario chiuso da scaricare a parte e una logica di ripiego con timeout.
+La storia sta nei commit fino alla v13, se un giorno servisse riprenderla.
 
 ### Testi
 

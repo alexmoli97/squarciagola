@@ -8,7 +8,6 @@ import it.squarciagola.lyrics.LyricsRepository
 import it.squarciagola.model.KaraokeFrame
 import it.squarciagola.model.Lyrics
 import it.squarciagola.model.PlaybackState
-import it.squarciagola.playback.AppRemoteSource
 import it.squarciagola.playback.AudioOutput
 import it.squarciagola.playback.PlaybackPoller
 import it.squarciagola.playback.PositionClock
@@ -47,7 +46,6 @@ object Engine {
         private set
     private lateinit var repository: LyricsRepository
     private lateinit var poller: PlaybackPoller
-    private lateinit var appRemote: AppRemoteSource
 
     private val _lyrics = MutableStateFlow<Lyrics>(Lyrics.None)
     val lyrics: StateFlow<Lyrics> = _lyrics.asStateFlow()
@@ -106,9 +104,6 @@ object Engine {
         appContext = context.applicationContext
         auth = SpotifyAuth(appContext)
         poller = PlaybackPoller(auth)
-        // Il Client ID si legge quando serve, non alla partenza: puo' essere incollato
-        // nell'app dopo l'avvio, e catturarlo qui lo bloccherebbe al valore vuoto.
-        appRemote = AppRemoteSource({ auth.clientId }, scope)
         repository = LyricsRepository(appContext.filesDir, LrcLibSource())
     }
 
@@ -121,62 +116,14 @@ object Engine {
      * di autorizzazione, e per farlo serve un'Activity. Dal servizio si passa comunque, e in
      * quel caso funziona solo se l'autorizzazione e' gia' stata concessa.
      */
+    /**
+     * Avvia l'ascolto. Una sola sorgente: il polling della Web API, che funziona ovunque
+     * ci sia rete, telefono, auto e televisore compresi.
+     */
     fun start(context: Context = appContext) {
-        if (avviando || appRemote.connected.value) return
-        avviando = true
-        // Si ritenta App Remote a ogni ritorno in primo piano, anche se la Web API sta gia'
-        // lavorando: e' quello che permette di passare alla sorgente migliore appena diventa
-        // disponibile, per esempio dopo aver concesso l'autorizzazione o riaperto Spotify.
-        // Senza questo, chi parte una volta sulla Web API ci resta per sempre.
-        appRemote.connect(context) { riuscito ->
-            avviando = false
-            when {
-                riuscito -> avviaConAppRemote()
-                running?.isActive != true -> avviaConWebApi()
-            }
-        }
-
-        // Rete di sicurezza: se la connessione non risponde ne' si' ne' no, si parte comunque
-        // con la Web API. Restare in attesa significherebbe nessuna sorgente attiva e uno
-        // schermo fermo senza spiegazione, che e' peggio di una sincronia meno precisa.
-        scope.launch {
-            delay(ATTESA_APP_REMOTE_MS)
-            if (avviando && running?.isActive != true) {
-                android.util.Log.i(TAG, "App Remote non risponde entro l'attesa, passo alla Web API")
-                avviando = false
-                avviaConWebApi()
-            }
-        }
-    }
-
-    private var avviando = false
-
-    private fun avviaConAppRemote() {
-        running?.cancel()
-        _origine.value = "App Remote"
-        _problem.value = null
-        android.util.Log.i(TAG, "Sorgente: App Remote, aggiornamenti spinti dall'app Spotify")
-        running = scope.launch {
-            launch { appRemote.state.collect { _playback.value = it } }
-            launch { appRemote.artwork.collect { _artwork.value = it } }
-            launch {
-                appRemote.state
-                    .map { it.track?.id }
-                    .distinctUntilChanged()
-                    .collect { loadLyricsForCurrentTrack(caricaCopertina = false) }
-            }
-            // Se l'app Spotify viene chiusa la connessione cade: si torna alla Web API invece
-            // di restare fermi su un ultimo stato che non si aggiorna piu'.
-            launch {
-                appRemote.connected.collect { collegato -> if (!collegato) avviaConWebApi() }
-            }
-        }
-    }
-
-    private fun avviaConWebApi() {
-        running?.cancel()
+        if (running?.isActive == true) return
         _origine.value = "Web API"
-        android.util.Log.i(TAG, "Sorgente: Web API, App Remote non disponibile")
+        android.util.Log.i(TAG, "Ascolto avviato sulla Web API di Spotify")
         running = scope.launch {
             launch { poller.run() }
             launch { poller.state.collect { _playback.value = it } }
@@ -193,7 +140,6 @@ object Engine {
     fun stop() {
         running?.cancel()
         running = null
-        appRemote.disconnect()
         _origine.value = ""
     }
 
@@ -254,7 +200,6 @@ object Engine {
     private fun prefs() = appContext.getSharedPreferences("squarciagola", Context.MODE_PRIVATE)
 
     private const val TAG = "Squarciagola"
-    private const val ATTESA_APP_REMOTE_MS = 6_000L
     private const val KEY_OFFSET_PREFIX = "offset_ms_"
     private const val OUTPUT_CACHE_MS = 2_000L
 }

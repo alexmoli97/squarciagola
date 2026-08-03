@@ -4,6 +4,8 @@ import android.content.Context
 import android.util.Base64
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.spotify.sdk.android.auth.AuthorizationRequest
+import com.spotify.sdk.android.auth.AuthorizationResponse
 import it.squarciagola.BuildConfig
 import it.squarciagola.net.Http
 import org.json.JSONObject
@@ -45,20 +47,23 @@ class SpotifyAuth(context: Context) {
 
     // --- avvio del login ------------------------------------------------------------------
 
-    /** Genera un verifier nuovo, lo salva e restituisce l'URL da aprire nel browser. */
-    fun buildAuthorizeUrl(): String? {
+    /**
+     * Richiesta di autorizzazione per la libreria di Spotify, che la presenta dentro l'app
+     * Spotify installata invece che nel browser.
+     *
+     * PKCE resta nostro: la libreria non lo genera, ma accetta parametri liberi, quindi il
+     * code challenge viaggia insieme al resto. Cosi' si tiene il refresh token, che con il
+     * flusso a token implicito si perderebbe costringendo a riaccedere ogni ora.
+     */
+    fun buildAuthorizationRequest(): AuthorizationRequest? {
         if (clientId.isEmpty()) return null
         val verifier = randomVerifier()
         prefs.edit().putString(KEY_VERIFIER, verifier).apply()
-        val params = mapOf(
-            "client_id" to clientId,
-            "response_type" to "code",
-            "redirect_uri" to REDIRECT_URI,
-            "code_challenge_method" to "S256",
-            "code_challenge" to challengeOf(verifier),
-            "scope" to SCOPE,
-        )
-        return "https://accounts.spotify.com/authorize?" + Http.encodeForm(params)
+        return AuthorizationRequest.Builder(clientId, AuthorizationResponse.Type.CODE, REDIRECT_URI)
+            .setScopes(SCOPE.split(" ").toTypedArray())
+            .setCustomParam("code_challenge_method", "S256")
+            .setCustomParam("code_challenge", challengeOf(verifier))
+            .build()
     }
 
     /** Scambia il codice ricevuto sul redirect. Da chiamare fuori dal main thread. */

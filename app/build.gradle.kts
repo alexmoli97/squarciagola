@@ -31,12 +31,17 @@ android {
         targetSdk = 35
         // Il versionCode e' il numero nel tag della release GitHub (v2, v3, ...): e' quello
         // che l'app confronta per capire se c'e' un aggiornamento. Vedi UpdateChecker.
-        versionCode = 13
-        versionName = "0.13"
+        versionCode = 14
+        versionName = "0.14"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Redirect URI dell'OAuth PKCE: it.squarciagola://auth
         manifestPlaceholders["authScheme"] = "it.squarciagola"
+        // La libreria di autorizzazione di Spotify dichiara il proprio ricevitore del
+        // redirect e vuole schema e host da qui: tenerli in un posto solo evita che divergano
+        // dal redirect registrato sul dashboard.
+        manifestPlaceholders["redirectSchemeName"] = "it.squarciagola"
+        manifestPlaceholders["redirectHostName"] = "auth"
 
         buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"$spotifyClientId\"")
     }
@@ -60,34 +65,11 @@ android {
     }
 }
 
-/**
- * App Remote non e' pubblicato su Maven: esiste solo come allegato alle release di
- * spotify/android-sdk. Si scarica al primo build invece di committarlo, per non ridistribuire
- * un binario chiuso di Spotify dentro un repository pubblico.
- */
-val spotifyAppRemote = layout.projectDirectory.file("libs/spotify-app-remote-release-0.8.0.aar")
-
-val scaricaAppRemote by tasks.registering {
-    val destinazione = spotifyAppRemote.asFile
-    outputs.file(destinazione)
-    doLast {
-        if (destinazione.exists() && destinazione.length() > 0) return@doLast
-        destinazione.parentFile.mkdirs()
-        val url = "https://github.com/spotify/android-sdk/releases/download/" +
-            "v0.8.0-appremote_v2.1.0-auth/spotify-app-remote-release-0.8.0.aar"
-        logger.lifecycle("Scarico Spotify App Remote da $url")
-        uri(url).toURL().openStream().use { input ->
-            destinazione.outputStream().use { input.copyTo(it) }
-        }
-    }
-}
-
-tasks.named("preBuild") { dependsOn(scaricaAppRemote) }
-
 dependencies {
-    implementation(files(spotifyAppRemote))
-    // Dipendenze richieste da App Remote, che l'aar non dichiara essendo un file locale.
-    implementation("com.google.code.gson:gson:2.11.0")
+    // Solo la libreria di autorizzazione dell'SDK Spotify, che sta su Maven. App Remote e'
+    // stato provato e rimosso: non stabiliva la connessione, ed esiste solo come binario
+    // chiuso da scaricare a parte.
+    implementation("com.spotify.android:auth:2.1.0")
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
