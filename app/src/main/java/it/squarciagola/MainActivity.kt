@@ -11,9 +11,7 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
-import com.spotify.sdk.android.auth.AuthorizationClient
-import com.spotify.sdk.android.auth.AuthorizationResponse
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -91,6 +89,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Engine.init(this)
+        handleAuthRedirect(intent)
         ContextCompat.registerReceiver(
             this,
             downloadDone,
@@ -119,22 +118,19 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    /**
-     * Ritorno dalla schermata di autorizzazione di Spotify. Il codice arriva qui e non da un
-     * redirect nel browser: lo riceve l'attivita' della libreria, che ce lo consegna come
-     * risultato.
-     */
-    private val login = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { esito ->
-        val risposta = AuthorizationClient.getResponse(esito.resultCode, esito.data)
-        when (risposta.type) {
-            AuthorizationResponse.Type.CODE -> lifecycleScope.launch {
-                val ok = withContext(Dispatchers.IO) { Engine.auth.exchangeCode(risposta.code) }
-                esitoLogin = if (ok) "Collegato a Spotify" else "Scambio del codice fallito"
-                if (ok) PlaybackService.start(this@MainActivity)
-            }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleAuthRedirect(intent)
+    }
 
-            AuthorizationResponse.Type.ERROR -> esitoLogin = "Spotify ha rifiutato: ${risposta.error}"
-            else -> esitoLogin = "Accesso annullato"
+    /** Ritorno del browser dopo il consenso: nell'URL c'è il codice da scambiare. */
+    private fun handleAuthRedirect(intent: Intent?) {
+        val code = intent?.data?.takeIf { it.scheme == "it.squarciagola" }?.getQueryParameter("code")
+            ?: return
+        lifecycleScope.launch {
+            val ok = withContext(Dispatchers.IO) { Engine.auth.exchangeCode(code) }
+            esitoLogin = if (ok) "Collegato a Spotify" else "Scambio del codice fallito"
+            if (ok) PlaybackService.start(this@MainActivity)
         }
     }
 
@@ -435,16 +431,12 @@ class MainActivity : ComponentActivity() {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FilledTonalButton(
                     onClick = {
-                        val richiesta = Engine.auth.buildAuthorizationRequest()
-                        if (richiesta == null) {
+                        val url = Engine.auth.buildAuthorizeUrl()
+                        if (url == null) {
                             onEsito("Manca il Client ID")
                         } else {
-                            login.launch(
-                                AuthorizationClient.createLoginActivityIntent(
-                                    this@MainActivity,
-                                    richiesta,
-                                )
-                            )
+                            CustomTabsIntent.Builder().build()
+                                .launchUrl(this@MainActivity, Uri.parse(url))
                         }
                     },
                     modifier = Modifier.heightIn(min = 48.dp),

@@ -31,17 +31,12 @@ android {
         targetSdk = 35
         // Il versionCode e' il numero nel tag della release GitHub (v2, v3, ...): e' quello
         // che l'app confronta per capire se c'e' un aggiornamento. Vedi UpdateChecker.
-        versionCode = 14
-        versionName = "0.14"
+        versionCode = 15
+        versionName = "0.15"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Redirect URI dell'OAuth PKCE: it.squarciagola://auth
         manifestPlaceholders["authScheme"] = "it.squarciagola"
-        // La libreria di autorizzazione di Spotify dichiara il proprio ricevitore del
-        // redirect e vuole schema e host da qui: tenerli in un posto solo evita che divergano
-        // dal redirect registrato sul dashboard.
-        manifestPlaceholders["redirectSchemeName"] = "it.squarciagola"
-        manifestPlaceholders["redirectHostName"] = "auth"
 
         buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"$spotifyClientId\"")
     }
@@ -66,11 +61,6 @@ android {
 }
 
 dependencies {
-    // Solo la libreria di autorizzazione dell'SDK Spotify, che sta su Maven. App Remote e'
-    // stato provato e rimosso: non stabiliva la connessione, ed esiste solo come binario
-    // chiuso da scaricare a parte.
-    implementation("com.spotify.android:auth:2.1.0")
-
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")

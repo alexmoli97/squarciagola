@@ -62,11 +62,21 @@ object Http {
                 conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
             }
             if (conn.responseCode !in 200..299) {
+                // Il corpo delle risposte di errore contiene la spiegazione vera: buttarlo
+                // significa ritrovarsi con un fallimento muto e nessun modo di capirlo.
+                val dettaglio = runCatching {
+                    conn.errorStream?.bufferedReader()?.use { it.readText() }
+                }.getOrNull().orEmpty()
+                android.util.Log.w(
+                    "Squarciagola",
+                    "$method $url ha risposto ${conn.responseCode}: ${dettaglio.take(400)}",
+                )
                 null
             } else {
                 conn.inputStream.bufferedReader().use { it.readText() }
             }
         } catch (e: IOException) {
+            android.util.Log.w("Squarciagola", "$method $url non riuscita: ${e.message}")
             null
         } finally {
             conn?.disconnect()

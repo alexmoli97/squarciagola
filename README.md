@@ -89,37 +89,26 @@ Chi installa l'APK senza ricompilare trova il campo e può incollarlo a mano.
 Gli scope richiesti sono `user-read-playback-state` e `user-read-currently-playing`.
 Non serve il client secret: l'autenticazione usa PKCE.
 
-### Accesso nativo invece che dal browser
+### Perche' l'SDK Android di Spotify non e' usato
 
-L'accesso passa dalla libreria di autorizzazione di Spotify: la richiesta di consenso compare
-dentro l'app Spotify installata, e solo in sua assenza si ripiega su una pagina web. Il codice
-torna come risultato dell'attivita', non come redirect nel browser.
+Entrambi i suoi pezzi sono stati provati sul dispositivo e rimossi.
 
-PKCE resta nostro: la libreria non lo genera, ma accetta parametri liberi, quindi il code
-challenge viaggia con la richiesta. E' cio' che permette di conservare il refresh token, che
-con il flusso a token implicito si perderebbe costringendo a riaccedere ogni ora.
+**App Remote** prometteva una sincronia migliore, leggendo la posizione dall'app Spotify senza
+rete di mezzo. La connessione non si e' mai stabilita: prima falliva chiedendo
+un'autorizzazione che non compariva, poi, dopo aver registrato package e impronta sul
+dashboard, restava appesa senza risposta. In cambio voleva un binario chiuso da scaricare a
+parte e una logica di ripiego con timeout.
 
-Perche' funzioni vanno registrati package e impronta della firma sul dashboard, in
-**Edit Settings**, sezione **Android Packages**:
+**La libreria di autorizzazione** presenta il consenso dentro l'app Spotify, il che sarebbe
+piu' comodo del browser. Il consenso passava, ma lo scambio del codice falliva con
+`invalid_request: Invalid client secret`: la libreria non inoltra i parametri liberi in cui
+viaggia il code challenge, quindi il codice veniva emesso senza PKCE e riscattarlo avrebbe
+richiesto un client secret, che in un APK non ci va.
 
-| Campo | Valore |
-|---|---|
-| Package name | `it.squarciagola` |
-| SHA-1 | ricavabile con il comando qui sotto |
+Resta quindi OAuth PKCE nel browser, scritto a mano: nessun segreto, refresh token conservato,
+e funziona ovunque, televisori compresi. La storia sta nei commit fino alla v14.
 
-```bash
-keytool -list -v -keystore ~/.android/debug.keystore \
-  -alias androiddebugkey -storepass android -keypass android | grep SHA1
-```
-
-Questo vincola il Client ID alla tua firma: da un'altra app, con lo stesso identificativo,
-l'accesso viene rifiutato.
-
-**App Remote e' stato provato e rimosso.** Prometteva una sincronia migliore, leggendo la
-posizione dall'app Spotify senza rete di mezzo, ma la connessione non si stabiliva mai: prima
-falliva chiedendo un'autorizzazione che non compariva, poi restava appesa senza risposta.
-Costava anche un binario chiuso da scaricare a parte e una logica di ripiego con timeout.
-La storia sta nei commit fino alla v13, se un giorno servisse riprenderla.
+Registrare package e impronta sul dashboard non serve piu', ma non fa danno ed e' gia' fatto.
 
 ### Testi
 
