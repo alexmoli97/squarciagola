@@ -14,7 +14,12 @@ plugins {
 val spotifyClientId: String = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) file.inputStream().use { load(it) }
-}.getProperty("spotify.clientId").orEmpty().trim()
+}.getProperty("spotify.clientId")
+    // Ricaduta sul valore committato in gradle.properties: cosi' una copia appena clonata
+    // compila e accede senza configurazione, e chi vuole il proprio lo mette in
+    // local.properties senza toccare il repository.
+    ?.takeIf { it.isNotBlank() }
+    ?: providers.gradleProperty("spotify.clientId").orNull.orEmpty()
 
 android {
     namespace = "it.squarciagola"
