@@ -146,6 +146,11 @@ Tema scuro unico, per la schermata e per il karaoke. Non è una preferenza estet
 si guarda al buio, in macchina di sera o col telefono nel supporto, e uno schermo chiaro in
 quelle condizioni acceca.
 
+La schermata iniziale e' un palco, non un pannello di controllo: in cima cosa sta suonando,
+grande, con l'azione per cantarlo; le impostazioni scendono sotto a un peso visivo minore.
+La copertina sfocata fa da sfondo anche qui, non solo nel karaoke, e il pulsante respira
+mentre la musica va.
+
 **L'accento lo detta la musica.** Resta la regola di sempre, un solo colore che marca la riga
 in corso e l'azione principale, ma quel colore viene ricavato dalla copertina del brano: ogni
 canzone tinge l'app della sua. Il colore dominante si sceglie per quanto è vivo e non per

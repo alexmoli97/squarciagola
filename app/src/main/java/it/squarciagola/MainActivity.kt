@@ -55,10 +55,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -193,138 +198,185 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        Column(
-            Modifier
-                .fillMaxSize()
-                .safeDrawingPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 22.dp)
-                .padding(top = 28.dp, bottom = 36.dp),
-        ) {
-            Intestazione()
-            Spacer(Modifier.height(28.dp))
+        Box(Modifier.fillMaxSize()) {
+            SfondoDelBrano()
 
-            aggiornamento?.let {
-                AvvisoAggiornamento(it) { messaggio -> esito = messaggio }
-                Spacer(Modifier.height(22.dp))
-            }
-
-            Adesso(playback, onCanta)
-            Spacer(Modifier.height(30.dp))
-
-            Sezione("Spotify") { Connessione { messaggio -> esito = messaggio } }
-            Spacer(Modifier.height(26.dp))
-
-            Sezione("Sincronia") { Sincronia() }
-            Spacer(Modifier.height(26.dp))
-
-            Sezione("Manutenzione") { Manutenzione { messaggio -> esito = messaggio } }
-
-            esitoLogin?.let {
-                Spacer(Modifier.height(20.dp))
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .safeDrawingPadding()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 22.dp)
+                    .padding(top = 24.dp, bottom = 40.dp),
+            ) {
                 Text(
-                    it,
-                    style = MaterialTheme.typography.bodyMedium,
+                    "Squarciagola",
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
                 )
-            }
-            esito?.let {
-                Spacer(Modifier.height(20.dp))
+
+                Spacer(Modifier.height(24.dp))
+                Palco(playback, onCanta)
+
+                aggiornamento?.let {
+                    Spacer(Modifier.height(26.dp))
+                    AvvisoAggiornamento(it) { messaggio -> esito = messaggio }
+                }
+
+                Spacer(Modifier.height(46.dp))
                 Text(
-                    it,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    "Impostazioni",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Spacer(Modifier.height(18.dp))
+
+                Sezione("Spotify") { Connessione { messaggio -> esito = messaggio } }
+                Spacer(Modifier.height(26.dp))
+
+                Sezione("Sincronia") { Sincronia() }
+                Spacer(Modifier.height(26.dp))
+
+                Sezione("Manutenzione") { Manutenzione { messaggio -> esito = messaggio } }
+
+                esitoLogin?.let {
+                    Spacer(Modifier.height(20.dp))
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                }
+                esito?.let {
+                    Spacer(Modifier.height(20.dp))
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                }
             }
         }
     }
 
+    /**
+     * La copertina sfocata dietro alla schermata, la stessa del karaoke.
+     *
+     * Prima la home era nera e piatta mentre il karaoke era pieno di colore: due stanze della
+     * stessa casa arredate da persone diverse. Ora il brano si sente anche prima di premere.
+     */
     @Composable
-    private fun Intestazione() {
-        Text(
-            "Squarciagola",
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            "Le parole giuste al momento giusto. L'intonazione è affar tuo.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    private fun SfondoDelBrano() {
+        val copertina by Engine.artwork.collectAsStateWithLifecycle()
+        val immagine = copertina ?: return
+        if (immagine.isRecycled) return
+        Canvas(Modifier.fillMaxSize()) {
+            drawImage(
+                image = immagine.asImageBitmap(),
+                dstSize = IntSize(size.width.toInt(), size.height.toInt()),
+                filterQuality = FilterQuality.Medium,
+            )
+            // Stesso velo del karaoke: la copertina si intuisce, il testo resta leggibile.
+            drawRect(Color(0xCC000000))
+        }
     }
 
-    /** Il blocco che risponde alla domanda vera: posso cantare adesso, sì o no. */
+    /**
+     * Il blocco che risponde alla domanda vera, e con il peso che quella domanda merita:
+     * cosa sta suonando, e posso cantarlo adesso.
+     */
     @Composable
-    private fun Adesso(playback: PlaybackState, onCanta: () -> Unit) {
+    private fun Palco(playback: PlaybackState, onCanta: () -> Unit) {
         val track = playback.track
-        Surface(
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(Modifier.padding(20.dp)) {
-                // Lo stato è la traccia intera, non il suo id: durante il dissolvimento il
-                // contenuto uscente deve continuare a mostrare il brano vecchio.
-                AnimatedContent(
-                    targetState = track,
-                    transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(180)) },
-                    label = "brano",
-                ) { brano ->
-                    if (brano == null) {
-                        Column {
-                            Text(
-                                if (Engine.auth.isLoggedIn) "Silenzio in cabina"
-                                else "Non ancora collegata",
-                                style = MaterialTheme.typography.titleLarge,
-                            )
-                            Text(
-                                if (Engine.auth.isLoggedIn)
-                                    "Fai partire qualcosa su Spotify e il testo compare qui."
-                                else "Collega Spotify qui sotto, poi torna su.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            // La diagnostica del poller: senza, "Silenzio in cabina" copre sia
-                            // il caso normale sia la sessione scaduta o la rete assente.
-                            Engine.problem.collectAsStateWithLifecycle().value
-                                ?.takeIf { Engine.auth.isLoggedIn }
-                                ?.let {
-                                    Spacer(Modifier.height(6.dp))
-                                    Text(
-                                        it,
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = MaterialTheme.colorScheme.primary,
-                                    )
-                                }
-                        }
-                    } else {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Equalizzatore(playback.isPlaying)
-                            Spacer(Modifier.width(14.dp))
-                            Column {
-                                Text(
-                                    brano.title,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    maxLines = 2,
-                                )
-                                Text(
-                                    brano.artist,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                )
-                            }
-                        }
-                    }
-                }
+        val animazioni = animazioniAttive()
 
-                Spacer(Modifier.height(18.dp))
-                Button(
-                    onClick = onCanta,
-                    enabled = track != null,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
-                ) { Text("Canta", style = MaterialTheme.typography.titleMedium) }
+        // Il pulsante respira mentre la musica va: un solo movimento, legato a uno stato, non
+        // un effetto sparso sulla schermata.
+        val respiro = if (track != null && playback.isPlaying && animazioni) {
+            val transizione = rememberInfiniteTransition(label = "respiro")
+            transizione.animateFloat(
+                initialValue = 1f,
+                targetValue = 1.035f,
+                animationSpec = infiniteRepeatable(
+                    tween(1400, easing = LinearEasing),
+                    RepeatMode.Reverse,
+                ),
+                label = "scala",
+            ).value
+        } else {
+            1f
+        }
+
+        AnimatedContent(
+            targetState = track,
+            transitionSpec = { fadeIn(tween(260)) togetherWith fadeOut(tween(260)) },
+            label = "palco",
+        ) { brano ->
+            Column {
+                if (brano == null) {
+                    Text(
+                        if (Engine.auth.isLoggedIn) "Silenzio in cabina" else "Non ancora collegata",
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        if (Engine.auth.isLoggedIn) "Fai partire qualcosa su Spotify."
+                        else "Collega Spotify qui sotto, poi torna su.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Engine.problem.collectAsStateWithLifecycle().value
+                        ?.takeIf { Engine.auth.isLoggedIn }
+                        ?.let {
+                            Spacer(Modifier.height(10.dp))
+                            Text(it, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                        }
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Equalizzatore(playback.isPlaying)
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            brano.artist,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        brano.title,
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = MaterialTheme.typography.displaySmall.fontSize * 1.1f,
+                        // I titoli con dentro mezza scheda del disco esistono: oltre le tre
+                        // righe spingerebbero l'azione principale fuori dalla prima schermata.
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
+        }
+
+        Spacer(Modifier.height(26.dp))
+        Button(
+            onClick = onCanta,
+            enabled = track != null,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 64.dp)
+                .scale(respiro),
+        ) {
+            Text(
+                if (track == null) "Canta" else "Canta a squarciagola",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+    }
+
+    /** Rispetta l'impostazione di sistema per la rimozione delle animazioni. */
+    @Composable
+    private fun animazioniAttive(): Boolean {
+        val context = LocalContext.current
+        return remember {
+            Settings.Global.getFloat(
+                context.contentResolver,
+                Settings.Global.ANIMATOR_DURATION_SCALE,
+                1f,
+            ) != 0f
         }
     }
 
@@ -334,15 +386,7 @@ class MainActivity : ComponentActivity() {
      */
     @Composable
     private fun Equalizzatore(inRiproduzione: Boolean) {
-        val context = LocalContext.current
-        val animazioniAttive = remember {
-            Settings.Global.getFloat(
-                context.contentResolver,
-                Settings.Global.ANIMATOR_DURATION_SCALE,
-                1f,
-            ) != 0f
-        }
-        val muoviti = inRiproduzione && animazioniAttive
+        val muoviti = inRiproduzione && animazioniAttive()
         val transizione = rememberInfiniteTransition(label = "equalizzatore")
         val altezze = listOf(620, 900, 740).mapIndexed { indice, durata ->
             if (!muoviti) {

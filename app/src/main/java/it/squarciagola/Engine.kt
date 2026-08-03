@@ -53,6 +53,9 @@ object Engine {
 
     private val _artwork = MutableStateFlow<android.graphics.Bitmap?>(null)
 
+    /** La copertina sfocata, usata come sfondo sia dal karaoke sia dalla schermata. */
+    val artwork: StateFlow<android.graphics.Bitmap?> = _artwork.asStateFlow()
+
     /** Colore dettato dalla copertina del brano, o il menta di sempre quando non c'e'. */
     private val _accento = MutableStateFlow(Accento.PREDEFINITO)
     val accento: StateFlow<Int> = _accento.asStateFlow()
