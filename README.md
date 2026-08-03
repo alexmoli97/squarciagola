@@ -146,12 +146,25 @@ Tema scuro unico, per la schermata e per il karaoke. Non è una preferenza estet
 si guarda al buio, in macchina di sera o col telefono nel supporto, e uno schermo chiaro in
 quelle condizioni acceca.
 
-Il verde menta è l'unico accento e non viene mai speso per decorare: marca la riga che si sta
-cantando e l'azione principale della schermata. Le tre barrette accanto al titolo si muovono
-mentre la musica va e si posano in pausa, così da lontano si vede se il polling sta ricevendo;
-seguono l'impostazione di sistema per la rimozione delle animazioni.
+**L'accento lo detta la musica.** Resta la regola di sempre, un solo colore che marca la riga
+in corso e l'azione principale, ma quel colore viene ricavato dalla copertina del brano: ogni
+canzone tinge l'app della sua. Il colore dominante si sceglie per quanto è vivo e non per
+quanto è diffuso, altrimenti vincerebbe sempre il grigio del fondo copertina, e viene poi
+riportato dentro una finestra di saturazione e luminosità che garantisce almeno 4,5:1 di
+contrasto sul fondo scuro. Una copertina senza colore ricade sul verde menta.
 
-In alto a destra nel karaoke c'è scritto da dove arriva il testo, e se è sincronizzato o no.
+**La riga in corso si riempie mentre viene cantata**, da sinistra a destra: la parte già
+passata prende il colore del brano, quella ancora da dire resta chiara. LRCLIB dà l'attacco
+di ogni riga e non di ogni parola, quindi l'avanzamento si ricava dallo spazio fra un attacco
+e il successivo, spartito fra le righe a schermo in proporzione ai caratteri. Non è preciso
+come una sincronia per parola, ma dice dove sei dentro la riga invece che soltanto su quale
+riga sei.
+
+Le tre barrette accanto al titolo si muovono mentre la musica va e si posano in pausa, così da
+lontano si vede se il polling sta ricevendo; seguono l'impostazione di sistema per la rimozione
+delle animazioni.
+
+In basso a destra nel karaoke c'è scritto da dove arriva il testo, e se è sincronizzato o no.
 
 ## Aggiornamenti senza store
 
@@ -213,6 +226,7 @@ non si pone.
 | `render/KaraokeRenderer.kt` | Tutto il disegno. Non conosce né l'auto né Compose |
 | `render/TextWrapper.kt` | Righe lunghe mandate a capo. Testato senza framework grafico |
 | `render/AlbumArt.kt` | Copertina sfocata con media mobile, sfondo del testo |
+| `ui/Accento.kt` | Colore dominante della copertina, riportato in leggibilità. Testato |
 | `update/UpdateChecker.kt` | Legge l'ultima release da GitHub. Testato |
 | `update/Updater.kt` | Download e avvio dell'installer di sistema |
 | `render/KaraokeView.kt` | Contenitore per il telefono |

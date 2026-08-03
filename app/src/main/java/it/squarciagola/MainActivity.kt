@@ -96,7 +96,10 @@ class MainActivity : ComponentActivity() {
             IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
             ContextCompat.RECEIVER_EXPORTED,
         )
-        setContent { SquarciagolaTheme { Root() } }
+        setContent {
+            val accento by Engine.accento.collectAsStateWithLifecycle()
+            SquarciagolaTheme(Color(accento)) { Root() }
+        }
     }
 
     /**

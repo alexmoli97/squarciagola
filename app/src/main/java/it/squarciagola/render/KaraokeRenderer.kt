@@ -72,7 +72,6 @@ class KaraokeRenderer {
         // vedrebbe come uno scatto. L'evidenziazione la portano grassetto, colore e alone.
         activePaint.textSize = LYRIC_SIZE * scale
         idlePaint.textSize = LYRIC_SIZE * scale
-        activePaint.setShadowLayer(activePaint.textSize * 0.5f, 0f, 0f, COLOR_GLOW)
 
         drawHeader(canvas, area, frame)
         drawBody(canvas, contentArea(area), frame)
@@ -126,7 +125,11 @@ class KaraokeRenderer {
         when (val lyrics = frame.lyrics) {
             is Lyrics.Synced -> {
                 val current = layoutFor(lyrics, lyrics.lines.map { it.text }, area)
-                drawScroller(canvas, area, current, LrcParser.activeIndex(lyrics.lines, frame.positionMs))
+                drawScroller(
+                    canvas, area, current,
+                    LrcParser.activeIndex(lyrics.lines, frame.positionMs),
+                    frame, lyrics.lines,
+                )
             }
 
             is Lyrics.Plain -> {
@@ -137,7 +140,7 @@ class KaraokeRenderer {
                 val ratio =
                     if (frame.durationMs > 0) frame.positionMs.toFloat() / frame.durationMs else 0f
                 val focus = (ratio * righe.size).toInt().coerceIn(0, (righe.size - 1).coerceAtLeast(0))
-                drawScroller(canvas, area, current, focus)
+                drawScroller(canvas, area, current, focus, frame, null)
             }
 
             else -> {
@@ -163,8 +166,17 @@ class KaraokeRenderer {
      * sta nel layout in cache. Restano confronti su un centinaio di numeri, niente di
      * misurabile.
      */
-    private fun drawScroller(canvas: Canvas, area: Rect, layout: Layout, active: Int) {
+    private fun drawScroller(
+        canvas: Canvas,
+        area: Rect,
+        layout: Layout,
+        active: Int,
+        frame: KaraokeFrame,
+        lines: List<LyricLine>?,
+    ) {
         if (layout.blocks.isEmpty()) return
+        val accento = frame.accent
+        activePaint.setShadowLayer(activePaint.textSize * 0.5f, 0f, 0f, alone(accento))
 
         // Le pause strumentali sono righe vuote nel file LRC. Se la telecamera ci si centrasse
         // sopra resterebbe uno schermo vuoto e nessuna riga evidenziata proprio mentre lo
@@ -193,14 +205,88 @@ class KaraokeRenderer {
             val top = originY + layout.tops[indice]
             if (top + layout.heights[indice] < area.top) continue
             if (top > area.bottom) break
-            val paint = if (indice == fuoco) activePaint else idlePaint
-            drawBlock(
-                canvas, area, layout.blocks[indice], top, layout.rowHeight, paint,
-                colorePer(indice - fuoco), centerX,
-            )
+            if (indice == fuoco) {
+                drawBloccoCantato(
+                    canvas, area, layout.blocks[indice], top, layout.rowHeight, centerX,
+                    accento, frazioneCantata(lines, fuoco, frame),
+                )
+            } else {
+                drawBlock(
+                    canvas, area, layout.blocks[indice], top, layout.rowHeight, idlePaint,
+                    colorePer(indice - fuoco), centerX,
+                )
+            }
         }
         canvas.restore()
     }
+
+    /**
+     * Quanto della riga corrente e' gia' stato cantato, fra 0 e 1.
+     *
+     * LRCLIB da' l'istante di attacco di ogni riga, non di ogni parola. La frazione si ricava
+     * dallo spazio fra un attacco e il successivo: non e' precisa quanto una sincronia per
+     * parola, ma dice dove sei dentro la riga invece che soltanto su quale riga sei.
+     */
+    private fun frazioneCantata(lines: List<LyricLine>?, fuoco: Int, frame: KaraokeFrame): Float {
+        if (lines == null || fuoco !in lines.indices) return 1f
+        val inizio = lines[fuoco].timeMs
+        val fine = if (fuoco + 1 < lines.size) lines[fuoco + 1].timeMs else frame.durationMs
+        if (fine <= inizio) return 1f
+        return ((frame.positionMs - inizio).toFloat() / (fine - inizio)).coerceIn(0f, 1f)
+    }
+
+    /**
+     * La riga in corso si riempie da sinistra a destra mentre viene cantata: la parte gia'
+     * passata prende il colore del brano, quella ancora da dire resta chiara. E' il gesto che
+     * distingue un karaoke da un testo che scorre.
+     */
+    private fun drawBloccoCantato(
+        canvas: Canvas,
+        area: Rect,
+        rows: List<String>,
+        top: Float,
+        rowHeight: Float,
+        centerX: Float,
+        accento: Int,
+        frazione: Float,
+    ) {
+        // La riga puo' occupare piu' righe a schermo: l'avanzamento si spartisce fra loro in
+        // proporzione ai caratteri, altrimenti su una riga lunga il riempimento correrebbe.
+        val totale = rows.sumOf { it.length }.coerceAtLeast(1)
+        var fatti = 0
+        rows.forEachIndexed { index, row ->
+            val rigaAlta = top + rowHeight * index
+            val visibile = rigaAlta >= area.top && rigaAlta + rowHeight <= area.bottom
+            if (row.isNotEmpty() && visibile) {
+                val inizio = fatti / totale.toFloat()
+                val fine = (fatti + row.length) / totale.toFloat()
+                val locale = if (fine > inizio) {
+                    ((frazione - inizio) / (fine - inizio)).coerceIn(0f, 1f)
+                } else {
+                    1f
+                }
+
+                val larghezza = activePaint.measureText(row)
+                activePaint.shader = when {
+                    locale <= 0f || larghezza <= 0f -> null
+                    locale >= 1f -> null
+                    else -> LinearGradient(
+                        centerX - larghezza / 2f, 0f, centerX + larghezza / 2f, 0f,
+                        intArrayOf(accento, accento, COLOR_DA_CANTARE, COLOR_DA_CANTARE),
+                        floatArrayOf(0f, locale, locale, 1f),
+                        Shader.TileMode.CLAMP,
+                    )
+                }
+                activePaint.color = if (locale >= 1f) accento else COLOR_DA_CANTARE
+                canvas.drawText(row, centerX, top + rowHeight * (index + 0.8f), activePaint)
+                activePaint.shader = null
+            }
+            fatti += row.length
+        }
+    }
+
+    /** L'alone attorno alla riga in corso: lo stesso colore del brano, appena accennato. */
+    private fun alone(accento: Int): Int = (accento and 0x00FFFFFF) or (0x66 shl 24)
 
     /**
      * Smorzamento esponenziale verso la destinazione, indipendente dalla cadenza dei
@@ -324,7 +410,7 @@ class KaraokeRenderer {
             area.left + margin, top, area.left + margin + width, top + height, height, height, barPaint
         )
         val ratio = (frame.positionMs.toFloat() / frame.durationMs).coerceIn(0f, 1f)
-        barPaint.color = if (frame.isPlaying) COLOR_ACTIVE else COLOR_DIM
+        barPaint.color = if (frame.isPlaying) frame.accent else COLOR_DIM
         canvas.drawRoundRect(
             area.left + margin, top, area.left + margin + width * ratio, top + height, height, height, barPaint
         )
@@ -421,9 +507,11 @@ class KaraokeRenderer {
 
         const val COLOR_BACKGROUND = 0xFF0B0B0F.toInt()
         const val COLOR_BACKGROUND_TOP = 0xFF111A15.toInt()
-        const val COLOR_GLOW = 0x667BE3A3
         const val COLOR_TITLE = Color.WHITE
         const val COLOR_ACTIVE = 0xFF7BE3A3.toInt()
+
+        /** La parte di riga non ancora cantata: chiara, per staccare da quella gia' passata. */
+        const val COLOR_DA_CANTARE = 0xFFF2F2F6.toInt()
         const val COLOR_NEAR = 0xFFD8D8DE.toInt()
         const val COLOR_FAR = 0xFFACACB6.toInt()
         const val COLOR_FAINT = 0xFF8C8C97.toInt()

@@ -5,7 +5,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.unit.dp
 
 /**
@@ -55,10 +59,30 @@ private val SquarciagolaShapes = Shapes(
     extraLarge = RoundedCornerShape(32.dp),
 )
 
+/**
+ * @param accento colore dettato dal brano in ascolto. La transizione e' animata perche' un
+ * cambio secco di tutta la tavolozza a ogni canzone sarebbe uno sfarfallio; cosi' invece si
+ * percepisce come l'app che prende il colore della musica.
+ */
 @Composable
-fun SquarciagolaTheme(content: @Composable () -> Unit) {
+fun SquarciagolaTheme(
+    accento: Color = Color(Accento.PREDEFINITO),
+    content: @Composable () -> Unit,
+) {
+    val colore by animateColorAsState(
+        targetValue = accento,
+        animationSpec = tween(durationMillis = 700),
+        label = "accento",
+    )
     MaterialTheme(
-        colorScheme = SquarciagolaColors,
+        // Il contrasto del testo sopra l'accento e' gia' garantito: Accento riporta ogni
+        // colore sopra 4,5:1 rispetto proprio a questo fondo scuro.
+        colorScheme = SquarciagolaColors.copy(
+            primary = colore,
+            onPrimary = Color(0xFF0B0B0F),
+            secondaryContainer = colore.copy(alpha = 0.22f).compositeOver(Color(0xFF16161C)),
+            onSecondaryContainer = Color(0xFFE6E6EC),
+        ),
         shapes = SquarciagolaShapes,
         content = content,
     )

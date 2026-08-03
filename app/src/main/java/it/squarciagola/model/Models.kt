@@ -60,6 +60,8 @@ data class KaraokeFrame(
     val isPlaying: Boolean = false,
     /** Copertina gia' ridotta, disegnata sfocata dietro al testo. Null se non disponibile. */
     val artwork: android.graphics.Bitmap? = null,
+    /** Colore che il brano detta: marca la riga cantata e l'avanzamento. */
+    val accent: Int = 0xFF7BE3A3.toInt(),
     /** Da dove arriva il testo mostrato. Vuoto se non c'è testo. */
     val source: String = "",
     /** Messaggio che sostituisce il testo quando qualcosa non va (login scaduto, niente rete). */

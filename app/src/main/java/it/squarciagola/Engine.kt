@@ -12,6 +12,7 @@ import it.squarciagola.playback.AudioOutput
 import it.squarciagola.playback.PlaybackPoller
 import it.squarciagola.playback.PositionClock
 import it.squarciagola.render.AlbumArt
+import it.squarciagola.ui.Accento
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -51,6 +52,10 @@ object Engine {
     val lyrics: StateFlow<Lyrics> = _lyrics.asStateFlow()
 
     private val _artwork = MutableStateFlow<android.graphics.Bitmap?>(null)
+
+    /** Colore dettato dalla copertina del brano, o il menta di sempre quando non c'e'. */
+    private val _accento = MutableStateFlow(Accento.PREDEFINITO)
+    val accento: StateFlow<Int> = _accento.asStateFlow()
 
     /**
      * Stato unificato: lo alimenta App Remote quando c'e' l'app Spotify sul dispositivo,
@@ -156,6 +161,7 @@ object Engine {
             durationMs = track?.durationMs ?: 0L,
             isPlaying = state.isPlaying,
             artwork = _artwork.value,
+            accent = _accento.value,
             source = when (lyrics) {
                 is Lyrics.Synced -> lyrics.source
                 is Lyrics.Plain -> "${lyrics.source}, non sincronizzato"
@@ -180,7 +186,10 @@ object Engine {
         val track = playback.value.track
         if (track == null) {
             _lyrics.value = Lyrics.None
-            if (caricaCopertina) _artwork.value = null
+            if (caricaCopertina) {
+                _artwork.value = null
+                _accento.value = Accento.PREDEFINITO
+            }
             return
         }
         _lyrics.value = Lyrics.Loading
@@ -188,7 +197,9 @@ object Engine {
         // resta quello scuro di sempre.
         if (caricaCopertina) {
             scope.launch(Dispatchers.IO) {
-                _artwork.value = track.artworkUrl.takeIf { it.isNotEmpty() }?.let { AlbumArt.load(it) }
+                val sfondo = track.artworkUrl.takeIf { it.isNotEmpty() }?.let { AlbumArt.load(it) }
+                _artwork.value = sfondo?.immagine
+                _accento.value = sfondo?.accento ?: Accento.PREDEFINITO
             }
         }
         _lyrics.value = withContext(Dispatchers.IO) { repository.load(track) }

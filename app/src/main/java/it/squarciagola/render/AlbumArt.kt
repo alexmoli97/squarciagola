@@ -3,6 +3,7 @@ package it.squarciagola.render
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import it.squarciagola.net.Http
+import it.squarciagola.ui.Accento
 
 /**
  * Copertina dell'album sfocata, da usare come sfondo del testo.
@@ -18,6 +19,9 @@ import it.squarciagola.net.Http
  * Tre passate di box blur approssimano una gaussiana abbastanza bene, e il costo si paga una
  * volta per brano su un thread di I/O, non nel ciclo di disegno.
  */
+/** Sfondo pronto: l'immagine sfocata e il colore che il brano detta all'interfaccia. */
+data class Sfondo(val immagine: Bitmap, val accento: Int)
+
 object AlbumArt {
 
     /** Lato dell'immagine su cui si sfoca. Piu' alto, piu' dettaglio e piu' lavoro. */
@@ -29,11 +33,11 @@ object AlbumArt {
     private const val PASSATE = 3
 
     private var urlInCache: String? = null
-    private var bitmapInCache: Bitmap? = null
+    private var bitmapInCache: Sfondo? = null
 
     /** Bloccante: va invocata su Dispatchers.IO. Null se non si riesce a scaricarla. */
     @Synchronized
-    fun load(url: String): Bitmap? {
+    fun load(url: String): Sfondo? {
         if (url == urlInCache) return bitmapInCache
 
         val bytes = Http.getBytes(url) ?: return null
@@ -49,8 +53,8 @@ object AlbumArt {
         if (sfocata !== ridotta) ridotta.recycle()
 
         urlInCache = url
-        bitmapInCache = sfocata
-        return sfocata
+        bitmapInCache = Sfondo(sfocata, accentoDi(sfocata))
+        return bitmapInCache
     }
 
     /**
@@ -58,18 +62,24 @@ object AlbumArt {
      * La chiave serve solo a non rifare il lavoro sullo stesso brano.
      */
     @Synchronized
-    fun blurred(chiave: String, source: Bitmap): Bitmap? {
+    fun blurred(chiave: String, source: Bitmap): Sfondo? {
         if (chiave == urlInCache) return bitmapInCache
 
         val ridotta = runCatching { Bitmap.createScaledBitmap(source, LATO, LATO, true) }
             .getOrNull() ?: return null
         val sfocata = runCatching { blur(ridotta) }.getOrNull() ?: ridotta
-        // Solo la copia ridotta e' nostra: quella ricevuta da App Remote appartiene all'SDK.
         if (sfocata !== ridotta && ridotta !== source) ridotta.recycle()
 
         urlInCache = chiave
-        bitmapInCache = sfocata
-        return sfocata
+        bitmapInCache = Sfondo(sfocata, accentoDi(sfocata))
+        return bitmapInCache
+    }
+
+    /** Il colore che il brano detta all'interfaccia, ricavato dall'immagine gia' sfocata. */
+    private fun accentoDi(immagine: Bitmap): Int {
+        val pixels = IntArray(immagine.width * immagine.height)
+        immagine.getPixels(pixels, 0, immagine.width, 0, 0, immagine.width, immagine.height)
+        return Accento.dominante(pixels)
     }
 
     @Synchronized
