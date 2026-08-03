@@ -41,16 +41,6 @@ class SpotifyAuth(context: Context) {
     /** True quando il Client ID arriva dal build e non c'e' nulla da chiedere all'utente. */
     val clientIdFromBuild: Boolean get() = BuildConfig.SPOTIFY_CLIENT_ID.isNotEmpty()
 
-    /** Cookie di sessione del web player, serve solo alla sorgente testi di Spotify. */
-    var spDc: String
-        get() = prefs.getString(KEY_SP_DC, "").orEmpty()
-        set(value) = prefs.edit().putString(KEY_SP_DC, value.trim()).apply()
-
-    /** Segreto TOTP estratto dal bundle del web player, in esadecimale. Vedi README. */
-    var totpSecretHex: String
-        get() = prefs.getString(KEY_TOTP, "").orEmpty()
-        set(value) = prefs.edit().putString(KEY_TOTP, value.trim()).apply()
-
     val isLoggedIn: Boolean get() = prefs.getString(KEY_REFRESH, null) != null
 
     // --- avvio del login ------------------------------------------------------------------
@@ -149,8 +139,6 @@ class SpotifyAuth(context: Context) {
         private const val REFRESH_MARGIN_MS = 60_000L
 
         private const val KEY_CLIENT_ID = "client_id"
-        private const val KEY_SP_DC = "sp_dc"
-        private const val KEY_TOTP = "totp_secret"
         private const val KEY_ACCESS = "access_token"
         private const val KEY_REFRESH = "refresh_token"
         private const val KEY_EXPIRES_AT = "expires_at"

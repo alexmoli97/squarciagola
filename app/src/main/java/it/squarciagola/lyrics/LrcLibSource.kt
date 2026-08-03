@@ -11,11 +11,12 @@ import org.json.JSONObject
  * La durata e' parte della chiave di ricerca e serve a distinguere versioni diverse dello
  * stesso brano (singolo, album, remaster), quindi va passata sempre.
  */
-class LrcLibSource : LyricsSource {
+class LrcLibSource {
 
-    override val name = "LRCLIB"
+    val name = "LRCLIB"
 
-    override fun fetch(track: TrackMeta): Lyrics? {
+    /** Bloccante: va invocata su Dispatchers.IO. Null se il brano non e' in catalogo. */
+    fun fetch(track: TrackMeta): Lyrics? {
         val query = Http.encodeForm(
             mapOf(
                 "artist_name" to track.artist,

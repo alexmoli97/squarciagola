@@ -18,7 +18,8 @@ esiste API per aggiungerne di terze parti. L'app compare come icona nel launcher
 concede solo alle app di categoria navigazione. Squarciagola si dichiara tale pur non essendo
 un navigatore: funziona in sideload, non supererebbe una review.
 
-**I testi di Spotify sono opzionali e fragili.** Vedi sotto.
+**Non usa i testi di Spotify.** Non esistono via API, e la strada non ufficiale e' stata
+valutata e scartata. Vedi sotto.
 
 ## Compilazione
 
@@ -68,40 +69,14 @@ Non serve il client secret: l'autenticazione usa PKCE.
 
 ### Testi
 
-Di base i testi arrivano da [LRCLIB](https://lrclib.net): pubblico, senza autenticazione,
-sincronizzato riga per riga. Non c'e' nulla da configurare.
+I testi arrivano da [LRCLIB](https://lrclib.net): pubblico, senza autenticazione, sincronizzato
+riga per riga. Non c'e' niente da configurare.
 
-L'interruttore **Usa i testi di Spotify** aggiunge come sorgente primaria l'endpoint interno
-`color-lyrics` del client Spotify, con LRCLIB che resta come riserva automatica.
-Prima di attivarlo, sappi che:
-
-- l'endpoint non fa parte della Web API pubblica e usarlo viola i Termini di Servizio di Spotify
-- richiede il cookie di sessione `sp_dc` del tuo account salvato dentro l'app
-- dal marzo 2025 la richiesta del token del web player richiede un codice TOTP, il cui segreto
-  Spotify ruota periodicamente: a ogni rotazione la sorgente smette di funzionare
-- comporta un rischio, per quanto basso, di provvedimenti sull'account
-
-Quando si rompe non resti a bocca asciutta: la sorgente restituisce "non disponibile" e il
-testo continua ad arrivare da LRCLIB. Te ne accorgi dal fatto che i testi tornano a essere
-quelli di LRCLIB, non da un errore a schermo.
-
-Per configurarla servono due valori presi dal web player. Vale la pena sapere cosa sono, perche'
-non sono impostazioni ma credenziali e contromisure:
-
-- **`sp_dc`** e' il cookie di sessione del tuo account sul web player, nei cookie di
-  `open.spotify.com` con la sessione aperta. Equivale a essere loggato come te: chi ce l'ha puo'
-  agire come il tuo account finche' non scade. Per questo l'app lo tiene in
-  EncryptedSharedPreferences e non fra le preferenze normali.
-- **segreto TOTP**, in esadecimale. Da marzo 2025 la richiesta del token del web player deve
-  portare un codice a sei cifre calcolato dall'ora corrente piu' un segreto incorporato nel
-  bundle JavaScript del player: e' una misura anti-automazione, serve a dimostrare che chi
-  chiama sta eseguendo il codice vero del web player. I progetti open source che seguono
-  l'endpoint pubblicano la coppia segreto/versione a ogni rotazione. La versione attesa dal
-  codice sta nella costante `TOTP_VERSION` in `SpotifyLyricsSource.kt` e va tenuta allineata al
-  segreto incollato nelle impostazioni: se divergono, il token viene rifiutato.
-
-Entrambi esistono solo per fingersi il web player ufficiale, ed e' esattamente il motivo per
-cui questa strada viola i ToS ed e' fragile per costruzione.
+Spotify non espone i testi tramite API. Esiste un endpoint interno raggiungibile fingendosi il
+web player, ma la strada e' stata valutata e scartata: costa il cookie di sessione dell'account
+dentro l'app, un segreto anti-automazione da rincorrere a ogni rotazione, e una violazione dei
+Termini di Servizio, per ottenere la stessa granularita' di sincronizzazione che LRCLIB da'
+gratis. Quando LRCLIB non ha un brano, l'app lo dice e passa oltre.
 
 ### Sincronia
 
@@ -122,14 +97,18 @@ Si regola dal telefono a passi di 50 ms e in auto con i due pulsanti sulla barra
 passi di 100 ms. Positivo se il testo va in ritardo rispetto a quello che senti. La scheda sul
 telefono mostra a quale uscita si riferisce il valore che stai modificando.
 
-### Quale sorgente sta lavorando
+### Interfaccia
 
-In alto a destra nel karaoke c'e' scritto da dove arriva il testo mostrato. Serve ad accorgersi
-quando la sorgente Spotify smette di rispondere e sta lavorando LRCLIB di riserva: il ripiego e'
-silenzioso per non interrompere l'ascolto, e senza questa indicazione non sarebbe visibile.
+Tema scuro unico, per la schermata e per il karaoke. Non e' una preferenza estetica: quest'app
+si guarda al buio, in macchina di sera o col telefono nel supporto, e uno schermo chiaro in
+quelle condizioni acceca.
 
-Cambiando l'interruttore della sorgente la cache dei testi viene svuotata, altrimenti i brani
-gia' visti resterebbero con il testo della sorgente precedente.
+Il verde menta e' l'unico accento e non viene mai speso per decorare: marca la riga che si sta
+cantando e l'azione principale della schermata. Le tre barrette accanto al titolo si muovono
+mentre la musica va e si posano in pausa, cosi' da lontano si vede se il polling sta ricevendo;
+seguono l'impostazione di sistema per la rimozione delle animazioni.
+
+In alto a destra nel karaoke c'e' scritto da dove arriva il testo, e se e' sincronizzato o no.
 
 ## Aggiornamenti senza store
 
@@ -177,9 +156,9 @@ non si pone.
 | `playback/PositionClock.kt` | Interpola la posizione tra due poll. Logica pura, testata |
 | `playback/PlaybackPoller.kt` | Poll di `/v1/me/player` ogni 4 secondi |
 | `lyrics/LrcParser.kt` | Parser LRC e ricerca binaria della riga attiva. Testato |
-| `lyrics/LrcLibSource.kt` | Sorgente pubblica, con ricerca di ripiego sui metadati |
-| `lyrics/SpotifyLyricsSource.kt` | Sorgente interna Spotify, TOTP e cookie di sessione |
-| `lyrics/LyricsRepository.kt` | Ordine delle sorgenti e cache su disco, esiti negativi inclusi |
+| `lyrics/LrcLibSource.kt` | Sorgente dei testi, con ricerca di ripiego sui metadati |
+| `lyrics/LyricsRepository.kt` | Cache su disco, esiti negativi inclusi |
+| `ui/Theme.kt` | Schema colori Material 3, solo scuro |
 | `render/KaraokeRenderer.kt` | Tutto il disegno. Non conosce ne' l'auto ne' Compose |
 | `render/TextWrapper.kt` | Righe lunghe mandate a capo. Testato senza framework grafico |
 | `update/UpdateChecker.kt` | Legge l'ultima release da GitHub. Testato |

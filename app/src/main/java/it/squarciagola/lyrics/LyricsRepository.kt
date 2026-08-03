@@ -10,31 +10,26 @@ import java.io.File
 /**
  * Trova il testo di una traccia e lo conserva su disco.
  *
- * L'ordine delle sorgenti e' quello ricevuto nel costruttore. Viene messo in cache anche
- * l'esito negativo: senza, ogni brano senza testo verrebbe ricercato di nuovo a ogni
- * riproduzione, e in auto significa attesa inutile a ogni cambio di canzone.
+ * Viene messo in cache anche l'esito negativo: senza, ogni brano senza testo verrebbe
+ * ricercato di nuovo a ogni riproduzione, e in auto significa attesa inutile a ogni cambio
+ * di canzone.
  *
  * ponytail: file JSON in filesDir, niente Room. Sono letture per chiave singola, poche
  * centinaia di record, nessuna query. Un database qui sarebbe impianto senza uso.
  */
 class LyricsRepository(
     private val cacheDir: File,
-    private val sources: List<LyricsSource>,
+    private val source: LrcLibSource,
 ) {
 
     /** Bloccante: va invocata su Dispatchers.IO. */
     fun load(track: TrackMeta): Lyrics {
         readCache(track.id)?.let { return it }
 
-        for (source in sources) {
-            val found = runCatching { source.fetch(track) }.getOrNull()
-            if (found != null) {
-                writeCache(track.id, found)
-                return found
-            }
-        }
-        writeCache(track.id, Lyrics.None)
-        return Lyrics.None
+        val found = runCatching { source.fetch(track) }.getOrNull()
+        val result = found ?: Lyrics.None
+        writeCache(track.id, result)
+        return result
     }
 
     fun clearCache() {

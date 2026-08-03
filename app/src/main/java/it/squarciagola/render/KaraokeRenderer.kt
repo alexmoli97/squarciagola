@@ -2,8 +2,10 @@ package it.squarciagola.render
 
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.Shader
 import android.graphics.Typeface
 import it.squarciagola.lyrics.LrcParser
 import it.squarciagola.model.KaraokeFrame
@@ -27,6 +29,7 @@ import it.squarciagola.model.Lyrics
 class KaraokeRenderer {
 
     private val background = Paint()
+    private var gradientArea = Rect()
     private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
     }
@@ -39,9 +42,9 @@ class KaraokeRenderer {
     private val barPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     fun draw(canvas: Canvas, area: Rect, frame: KaraokeFrame) {
-        background.color = COLOR_BACKGROUND
-        canvas.drawRect(area, background)
         if (area.width() <= 0 || area.height() <= 0) return
+        ensureBackground(area)
+        canvas.drawRect(area, background)
 
         // Il fattore piu' stretto tra larghezza e altezza: il testo resta leggibile sia sullo
         // schermo largo dell'auto sia in verticale sul telefono, senza traboccare da nessuna
@@ -51,6 +54,12 @@ class KaraokeRenderer {
         subtitlePaint.textSize = 14f * scale
         activePaint.textSize = 28f * scale
         idlePaint.textSize = 22f * scale
+
+        // Alone attorno alla riga che si sta cantando: la stacca dalle altre anche con lo
+        // sguardo di sbieco, che in macchina e' l'unico sguardo disponibile.
+        // ponytail: shadow layer, non un blur vero. Costa poco su testo corto; se un giorno
+        // dovesse pesare, si passa a un livello disegnato a parte.
+        activePaint.setShadowLayer(activePaint.textSize * 0.55f, 0f, 0f, COLOR_GLOW)
 
         drawHeader(canvas, area, frame)
         drawBody(canvas, area, frame)
@@ -100,8 +109,8 @@ class KaraokeRenderer {
             is Lyrics.Plain -> drawPlain(canvas, area, lyrics, frame, centerX, centerY)
             else -> {
                 idlePaint.color = COLOR_DIM
-                val text = frame.message ?: if (frame.title.isEmpty()) "In attesa di Spotify"
-                else "Nessun testo per questo brano"
+                val text = frame.message ?: if (frame.title.isEmpty()) "Silenzio in cabina"
+                else "Di questo brano non si trova il testo"
                 drawBlock(
                     canvas, area,
                     wrapFor(text, idlePaint, area.width() * 0.9f),
@@ -230,6 +239,22 @@ class KaraokeRenderer {
 
     private fun colorFor(offset: Int) = if (offset == 1) COLOR_NEAR else COLOR_FAR
 
+    /**
+     * Sfondo con una velatura verde appena accennata in alto, ricalcolata solo quando l'area
+     * cambia: costruire uno shader a ogni fotogramma sarebbe spreco.
+     */
+    private fun ensureBackground(area: Rect) {
+        if (area == gradientArea) return
+        background.shader = LinearGradient(
+            area.exactCenterX(), area.top.toFloat(),
+            area.exactCenterX(), area.bottom.toFloat(),
+            intArrayOf(COLOR_BACKGROUND_TOP, COLOR_BACKGROUND, COLOR_BACKGROUND),
+            floatArrayOf(0f, 0.5f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        gradientArea = Rect(area)
+    }
+
     private fun wrapFor(text: String, paint: Paint, maxWidth: Float): List<String> =
         TextWrapper.wrap(text, maxWidth) { paint.measureText(it) }
 
@@ -289,6 +314,8 @@ class KaraokeRenderer {
         const val REFERENCE_HEIGHT = 340f
 
         const val COLOR_BACKGROUND = 0xFF0B0B0F.toInt()
+        const val COLOR_BACKGROUND_TOP = 0xFF111A15.toInt()
+        const val COLOR_GLOW = 0x667BE3A3
         const val COLOR_TITLE = Color.WHITE
         const val COLOR_ACTIVE = 0xFF7BE3A3.toInt()
         const val COLOR_NEAR = 0xFFD8D8DE.toInt()

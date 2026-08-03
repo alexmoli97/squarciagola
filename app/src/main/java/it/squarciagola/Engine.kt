@@ -5,8 +5,6 @@ import android.os.SystemClock
 import it.squarciagola.auth.SpotifyAuth
 import it.squarciagola.lyrics.LrcLibSource
 import it.squarciagola.lyrics.LyricsRepository
-import it.squarciagola.lyrics.LyricsSource
-import it.squarciagola.lyrics.SpotifyLyricsSource
 import it.squarciagola.model.KaraokeFrame
 import it.squarciagola.model.Lyrics
 import it.squarciagola.model.PlaybackState
@@ -86,23 +84,12 @@ object Engine {
     private var cachedOutputName = AudioOutput.DEFAULT
     private var outputCheckedAt = 0L
 
-    /** Se false, la sorgente Spotify viene saltata e si usa solo LRCLIB. */
-    var useSpotifyLyrics: Boolean
-        get() = prefs().getBoolean(KEY_USE_SPOTIFY, false)
-        set(value) {
-            prefs().edit().putBoolean(KEY_USE_SPOTIFY, value).apply()
-            rebuildRepository()
-            // Senza questo il testo gia' in cache resterebbe quello della sorgente precedente,
-            // e cambiare interruttore sembrerebbe non avere alcun effetto.
-            clearLyricsCache()
-        }
-
     fun init(context: Context) {
         if (::appContext.isInitialized) return
         appContext = context.applicationContext
         auth = SpotifyAuth(appContext)
         poller = PlaybackPoller(auth)
-        rebuildRepository()
+        repository = LyricsRepository(appContext.filesDir, LrcLibSource())
     }
 
     fun start() {
@@ -161,19 +148,10 @@ object Engine {
         _lyrics.value = withContext(Dispatchers.IO) { repository.load(track) }
     }
 
-    private fun rebuildRepository() {
-        val sources = buildList<LyricsSource> {
-            if (useSpotifyLyrics) add(SpotifyLyricsSource(auth))
-            add(LrcLibSource())
-        }
-        repository = LyricsRepository(appContext.filesDir, sources)
-    }
-
     private fun offsetKey() = "$KEY_OFFSET_PREFIX$outputName"
 
     private fun prefs() = appContext.getSharedPreferences("squarciagola", Context.MODE_PRIVATE)
 
     private const val KEY_OFFSET_PREFIX = "offset_ms_"
-    private const val KEY_USE_SPOTIFY = "use_spotify_lyrics"
     private const val OUTPUT_CACHE_MS = 2_000L
 }
