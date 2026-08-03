@@ -91,6 +91,45 @@ riportata da Spotify e' gia' vecchia quando arriva. L'offset si regola dal telef
 50 ms e in auto con i due pulsanti sulla barra dei comandi, a passi di 100 ms. Positivo se il
 testo va in ritardo rispetto a quello che senti.
 
+## Aggiornamenti senza store
+
+L'app si aggiorna da sola dalle release di GitHub. Non c'e' server, non c'e' manifest da
+mantenere: pubblicare una versione significa creare una release con l'APK allegato.
+
+**Regola unica**: il tag della release e' `v<versionCode>`, e quel numero deve coincidere con
+il `versionCode` in `app/build.gradle.kts`. Release `v3` vuol dire `versionCode = 3`.
+
+Il repository di riferimento e' la costante `REPOSITORY` in `update/UpdateChecker.kt`.
+Va messa sul tuo repo prima della prima release, altrimenti il controllo cerca un indirizzo
+che non esiste.
+
+### Pubblicare una versione
+
+```bash
+# 1. alza versionCode e versionName in app/build.gradle.kts
+./gradlew :app:assembleDebug
+gh release create v3 app/build/outputs/apk/debug/app-debug.apk --title "0.3" --notes "Cosa cambia"
+```
+
+### Cosa succede sul telefono
+
+All'apertura l'app interroga GitHub in silenzio: se non c'e' rete o non c'e' niente di nuovo
+non compare nulla. Quando trova una versione con numero piu' alto mostra una scheda con le
+note di rilascio e il pulsante **Aggiorna**. C'e' anche **Controlla aggiornamenti** per
+forzare il controllo a mano.
+
+Premendo Aggiorna il download passa da DownloadManager, con la sua notifica di avanzamento, e
+al termine parte l'installer di sistema. La conferma finale la chiede Android: un'app non
+puo' sostituirsi da sola in silenzio.
+
+La prima volta serve concedere a Squarciagola il permesso di installare app ("Installa app
+sconosciute"). Il pulsante ci porta direttamente nella schermata giusta; concesso il permesso,
+si ripreme Aggiorna.
+
+Le firme devono combaciare: se cambi il keystore fra una versione e l'altra, Android rifiuta
+l'aggiornamento e va disinstallata e reinstallata. Restando sulla build di debug il problema
+non si pone.
+
 ## Come e' fatto
 
 | File | Ruolo |
@@ -102,6 +141,9 @@ testo va in ritardo rispetto a quello che senti.
 | `lyrics/SpotifyLyricsSource.kt` | Sorgente interna Spotify, TOTP e cookie di sessione |
 | `lyrics/LyricsRepository.kt` | Ordine delle sorgenti e cache su disco, esiti negativi inclusi |
 | `render/KaraokeRenderer.kt` | Tutto il disegno. Non conosce ne' l'auto ne' Compose |
+| `render/TextWrapper.kt` | Righe lunghe mandate a capo. Testato senza framework grafico |
+| `update/UpdateChecker.kt` | Legge l'ultima release da GitHub. Testato |
+| `update/Updater.kt` | Download e avvio dell'installer di sistema |
 | `render/KaraokeView.kt` | Contenitore per il telefono |
 | `car/CarSurfaceRenderer.kt` | Contenitore per la Surface dell'auto, 30 fotogrammi al secondo |
 | `Engine.kt` | Stato condiviso tra i due schermi |
@@ -109,6 +151,9 @@ testo va in ritardo rispetto a quello che senti.
 
 ## Stato della verifica
 
-Test unitari eseguiti e verdi: 14 casi su `PositionClock` e sul parser LRC.
-Il resto (rendering, integrazione con Android Auto, flusso OAuth completo) non e' verificabile
-senza dispositivo: va provato con il Desktop Head Unit o in macchina.
+Test unitari eseguiti e verdi: 27 casi su `PositionClock`, parser LRC, `TextWrapper` e
+`UpdateChecker`.
+
+Il resto (rendering a schermo, integrazione con Android Auto, flusso OAuth completo, download e
+installazione dell'aggiornamento) non e' verificabile senza dispositivo: va provato a mano, con
+il Desktop Head Unit o in macchina.

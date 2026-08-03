@@ -12,8 +12,10 @@ android {
         applicationId = "it.squarciagola"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1"
+        // Il versionCode e' il numero nel tag della release GitHub (v2, v3, ...): e' quello
+        // che l'app confronta per capire se c'e' un aggiornamento. Vedi UpdateChecker.
+        versionCode = 2
+        versionName = "0.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Redirect URI dell'OAuth PKCE: it.squarciagola://auth
@@ -35,6 +37,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -60,4 +63,6 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
 
     testImplementation("junit:junit:4.13.2")
+    // Implementazione reale di org.json: quella di Android nei test unitari e' solo uno stub.
+    testImplementation("org.json:json:20240303")
 }

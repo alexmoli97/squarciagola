@@ -7,6 +7,7 @@ import android.graphics.Rect
 import android.graphics.Typeface
 import it.squarciagola.lyrics.LrcParser
 import it.squarciagola.model.KaraokeFrame
+import it.squarciagola.model.LyricLine
 import it.squarciagola.model.Lyrics
 
 /**
@@ -15,6 +16,10 @@ import it.squarciagola.model.Lyrics
  * Non conosce ne' Android Auto ne' Compose: riceve un Canvas e un'area, e disegna. E' la
  * ragione per cui lo stesso karaoke gira sullo schermo dell'auto e su quello del telefono
  * senza duplicare nulla.
+ *
+ * Le due forme sono molto diverse: in auto lo spazio e' largo e basso, sul telefono in
+ * verticale e' stretto e alto. Per questo la dimensione del testo tiene conto di entrambe le
+ * misure e le righe lunghe vanno a capo invece di essere troncate.
  *
  * I Paint sono campi e non variabili locali: questo metodo viene invocato trenta volte al
  * secondo e allocare nel ciclo di disegno si vede.
@@ -36,12 +41,16 @@ class KaraokeRenderer {
     fun draw(canvas: Canvas, area: Rect, frame: KaraokeFrame) {
         background.color = COLOR_BACKGROUND
         canvas.drawRect(area, background)
+        if (area.width() <= 0 || area.height() <= 0) return
 
-        val scale = area.height() / 400f
-        titlePaint.textSize = 20f * scale
-        subtitlePaint.textSize = 15f * scale
-        activePaint.textSize = 30f * scale
-        idlePaint.textSize = 24f * scale
+        // Il fattore piu' stretto tra larghezza e altezza: il testo resta leggibile sia sullo
+        // schermo largo dell'auto sia in verticale sul telefono, senza traboccare da nessuna
+        // delle due parti.
+        val scale = minOf(area.width() / REFERENCE_WIDTH, area.height() / REFERENCE_HEIGHT)
+        titlePaint.textSize = 19f * scale
+        subtitlePaint.textSize = 14f * scale
+        activePaint.textSize = 28f * scale
+        idlePaint.textSize = 22f * scale
 
         drawHeader(canvas, area, frame)
         drawBody(canvas, area, frame)
@@ -70,16 +79,22 @@ class KaraokeRenderer {
 
     private fun drawBody(canvas: Canvas, area: Rect, frame: KaraokeFrame) {
         val centerX = area.exactCenterX()
-        val centerY = area.exactCenterY() + area.height() * 0.04f
+        val centerY = area.exactCenterY() + area.height() * 0.03f
 
         when (val lyrics = frame.lyrics) {
-            is Lyrics.Synced -> drawSynced(canvas, area, lyrics, frame.positionMs, centerX, centerY)
+            is Lyrics.Synced -> drawSynced(canvas, area, lyrics.lines, frame.positionMs, centerX, centerY)
             is Lyrics.Plain -> drawPlain(canvas, area, lyrics, frame, centerX, centerY)
             else -> {
                 idlePaint.color = COLOR_DIM
                 val text = frame.message ?: if (frame.title.isEmpty()) "In attesa di Spotify"
                 else "Nessun testo per questo brano"
-                canvas.drawText(ellipsize(text, idlePaint, area.width() * 0.9f), centerX, centerY, idlePaint)
+                drawBlock(
+                    canvas, area,
+                    wrapFor(text, idlePaint, area.width() * 0.9f),
+                    centerY - idlePaint.textSize,
+                    idlePaint.textSize * ROW_SPACING,
+                    idlePaint, COLOR_DIM, centerX,
+                )
             }
         }
     }
@@ -87,46 +102,51 @@ class KaraokeRenderer {
     private fun drawSynced(
         canvas: Canvas,
         area: Rect,
-        lyrics: Lyrics.Synced,
+        lines: List<LyricLine>,
         positionMs: Long,
         centerX: Float,
         centerY: Float,
     ) {
-        val lines = lyrics.lines
+        if (lines.isEmpty()) return
         val active = LrcParser.activeIndex(lines, positionMs)
-        val rowHeight = activePaint.textSize * 1.7f
         val maxWidth = area.width() * 0.92f
+        val activeRowHeight = activePaint.textSize * ROW_SPACING
+        val idleRowHeight = idlePaint.textSize * ROW_SPACING
+        val gap = idlePaint.textSize * 0.5f
 
-        // Scorrimento continuo: nell'ultimo tratto prima della riga successiva le righe si
-        // spostano gradualmente, invece di saltare di colpo.
-        val shift = scrollShift(lines, active, positionMs)
+        val activeRows =
+            if (active in lines.indices) wrapFor(lines[active].text, activePaint, maxWidth) else emptyList()
+        val activeHeight = activeRows.size * activeRowHeight
 
-        for (offset in -VISIBLE_ABOVE..VISIBLE_BELOW) {
-            val index = active + offset
-            if (index < 0 || index >= lines.size) continue
-            val text = lines[index].text
-            if (text.isEmpty()) continue
+        // Scorrimento continuo: nell'ultimo tratto prima della riga successiva il blocco si
+        // sposta gradualmente verso l'alto, invece di saltare di colpo.
+        val shift = scrollShift(lines, active, positionMs) * (activeHeight + gap)
+        val activeTop = centerY - activeHeight / 2f - shift
 
-            val y = centerY + (offset - shift) * rowHeight
-            if (y < area.top + rowHeight * 0.5f || y > area.bottom - rowHeight * 0.5f) continue
-
-            val paint = if (offset == 0) activePaint else idlePaint
-            paint.color = when {
-                offset == 0 -> COLOR_ACTIVE
-                offset == -1 || offset == 1 -> COLOR_NEAR
-                else -> COLOR_FAR
-            }
-            canvas.drawText(ellipsize(text, paint, maxWidth), centerX, y, paint)
+        if (activeRows.isNotEmpty()) {
+            drawBlock(canvas, area, activeRows, activeTop, activeRowHeight, activePaint, COLOR_ACTIVE, centerX)
         }
-    }
 
-    /** Frazione di riga gia' percorsa, usata per lo scorrimento continuo. */
-    private fun scrollShift(lines: List<it.squarciagola.model.LyricLine>, active: Int, positionMs: Long): Float {
-        if (active < 0 || active + 1 >= lines.size) return 0f
-        val next = lines[active + 1].timeMs
-        val remaining = next - positionMs
-        if (remaining >= SCROLL_LEAD_MS || remaining < 0) return 0f
-        return 1f - remaining / SCROLL_LEAD_MS.toFloat()
+        var top = activeTop
+        for (offset in 1..VISIBLE_ABOVE) {
+            val index = active - offset
+            if (index < 0) break
+            val rows = wrapFor(lines[index].text, idlePaint, maxWidth)
+            top -= gap + rows.size * idleRowHeight
+            if (top + rows.size * idleRowHeight < area.top) break
+            drawBlock(canvas, area, rows, top, idleRowHeight, idlePaint, colorFor(offset), centerX)
+        }
+
+        var bottom = activeTop + activeHeight
+        for (offset in 1..VISIBLE_BELOW) {
+            val index = active + offset
+            if (index !in lines.indices) break
+            val rows = wrapFor(lines[index].text, idlePaint, maxWidth)
+            bottom += gap
+            if (bottom > area.bottom) break
+            drawBlock(canvas, area, rows, bottom, idleRowHeight, idlePaint, colorFor(offset), centerX)
+            bottom += rows.size * idleRowHeight
+        }
     }
 
     private fun drawPlain(
@@ -137,32 +157,81 @@ class KaraokeRenderer {
         centerX: Float,
         centerY: Float,
     ) {
-        val lines = lyrics.text.lines()
-        val rowHeight = idlePaint.textSize * 1.6f
+        val lines = lyrics.text.lines().map { it.trim() }
+        if (lines.isEmpty()) return
         val maxWidth = area.width() * 0.92f
+        val rowHeight = idlePaint.textSize * ROW_SPACING
+        val gap = idlePaint.textSize * 0.5f
+
         // Testo senza timestamp: si scorre in proporzione alla posizione nel brano. Non e'
         // sincronia, e' un compromesso onesto per non lasciare fermo un muro di testo.
         val ratio = if (frame.durationMs > 0) frame.positionMs.toFloat() / frame.durationMs else 0f
-        val focus = (ratio * lines.size).toInt().coerceIn(0, (lines.size - 1).coerceAtLeast(0))
+        val focus = (ratio * lines.size).toInt().coerceIn(0, lines.size - 1)
 
-        idlePaint.color = COLOR_NEAR
-        for (offset in -VISIBLE_ABOVE..VISIBLE_BELOW) {
-            val index = focus + offset
-            if (index < 0 || index >= lines.size) continue
-            val text = lines[index].trim()
-            if (text.isEmpty()) continue
-            val y = centerY + offset * rowHeight
-            if (y < area.top + rowHeight || y > area.bottom - rowHeight) continue
-            idlePaint.color = if (offset == 0) COLOR_ACTIVE else COLOR_FAR
-            canvas.drawText(ellipsize(text, idlePaint, maxWidth), centerX, y, idlePaint)
+        val focusRows = wrapFor(lines[focus], idlePaint, maxWidth)
+        val focusTop = centerY - focusRows.size * rowHeight / 2f
+        drawBlock(canvas, area, focusRows, focusTop, rowHeight, idlePaint, COLOR_ACTIVE, centerX)
+
+        var top = focusTop
+        for (offset in 1..VISIBLE_ABOVE) {
+            val index = focus - offset
+            if (index < 0) break
+            val rows = wrapFor(lines[index], idlePaint, maxWidth)
+            top -= gap + rows.size * rowHeight
+            if (top + rows.size * rowHeight < area.top) break
+            drawBlock(canvas, area, rows, top, rowHeight, idlePaint, colorFor(offset), centerX)
         }
+
+        var bottom = focusTop + focusRows.size * rowHeight
+        for (offset in 1..VISIBLE_BELOW) {
+            val index = focus + offset
+            if (index >= lines.size) break
+            val rows = wrapFor(lines[index], idlePaint, maxWidth)
+            bottom += gap
+            if (bottom > area.bottom) break
+            drawBlock(canvas, area, rows, bottom, rowHeight, idlePaint, colorFor(offset), centerX)
+            bottom += rows.size * rowHeight
+        }
+    }
+
+    /** Disegna un blocco di righe gia' mandate a capo, saltando quelle fuori dall'area. */
+    private fun drawBlock(
+        canvas: Canvas,
+        area: Rect,
+        rows: List<String>,
+        top: Float,
+        rowHeight: Float,
+        paint: Paint,
+        color: Int,
+        centerX: Float,
+    ) {
+        paint.color = color
+        rows.forEachIndexed { index, row ->
+            if (row.isEmpty()) return@forEachIndexed
+            val baseline = top + rowHeight * (index + 0.82f)
+            if (baseline < area.top + paint.textSize || baseline > area.bottom) return@forEachIndexed
+            canvas.drawText(row, centerX, baseline, paint)
+        }
+    }
+
+    private fun colorFor(offset: Int) = if (offset == 1) COLOR_NEAR else COLOR_FAR
+
+    private fun wrapFor(text: String, paint: Paint, maxWidth: Float): List<String> =
+        TextWrapper.wrap(text, maxWidth) { paint.measureText(it) }
+
+    /** Frazione di riga gia' percorsa, usata per lo scorrimento continuo. */
+    private fun scrollShift(lines: List<LyricLine>, active: Int, positionMs: Long): Float {
+        if (active < 0 || active + 1 >= lines.size) return 0f
+        val remaining = lines[active + 1].timeMs - positionMs
+        if (remaining >= SCROLL_LEAD_MS || remaining < 0) return 0f
+        return 1f - remaining / SCROLL_LEAD_MS.toFloat()
     }
 
     private fun drawProgress(canvas: Canvas, area: Rect, frame: KaraokeFrame) {
         if (frame.durationMs <= 0) return
         val margin = area.width() * 0.05f
-        val height = area.height() * 0.012f
-        val top = area.bottom - area.height() * 0.09f
+        val height = area.height() * 0.008f + 2f
+        val top = area.bottom - subtitlePaint.textSize * 2.6f
         val width = area.width() - margin * 2
 
         barPaint.color = COLOR_BAR_BACKGROUND
@@ -179,7 +248,7 @@ class KaraokeRenderer {
         canvas.drawText(
             "${clock(frame.positionMs)} / ${clock(frame.durationMs)}",
             area.left + margin,
-            top + height + subtitlePaint.textSize * 1.4f,
+            top + height + subtitlePaint.textSize * 1.3f,
             subtitlePaint,
         )
     }
@@ -196,9 +265,14 @@ class KaraokeRenderer {
     }
 
     private companion object {
-        const val VISIBLE_ABOVE = 2
-        const val VISIBLE_BELOW = 3
+        const val VISIBLE_ABOVE = 3
+        const val VISIBLE_BELOW = 4
+        const val ROW_SPACING = 1.28f
         const val SCROLL_LEAD_MS = 260L
+
+        /** Misure di riferimento su cui e' tarata la scala del testo. */
+        const val REFERENCE_WIDTH = 420f
+        const val REFERENCE_HEIGHT = 340f
 
         const val COLOR_BACKGROUND = 0xFF0B0B0F.toInt()
         const val COLOR_TITLE = Color.WHITE

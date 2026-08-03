@@ -1,17 +1,23 @@
 package it.squarciagola
 
+import android.app.DownloadManager
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -22,6 +28,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,19 +37,44 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import it.squarciagola.render.KaraokeView
+import it.squarciagola.update.Release
+import it.squarciagola.update.UpdateChecker
+import it.squarciagola.update.Updater
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
 
+    /** Id del download in corso, per sapere quale notifica di completamento riguarda noi. */
+    private var downloadId: Long = -1L
+
+    private val downloadDone = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val done = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
+            if (done != -1L && done == downloadId) Updater.install(this@MainActivity, done)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Engine.init(this)
         handleAuthRedirect(intent)
+        ContextCompat.registerReceiver(
+            this,
+            downloadDone,
+            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+            ContextCompat.RECEIVER_EXPORTED,
+        )
         setContent { MaterialTheme { Root() } }
+    }
+
+    override fun onDestroy() {
+        runCatching { unregisterReceiver(downloadDone) }
+        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -60,19 +92,26 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // --- interfaccia ----------------------------------------------------------------------
+
     @Composable
     private fun Root() {
         var karaokeAperto by remember { mutableStateOf(false) }
         if (karaokeAperto) {
-            AndroidView(
-                factory = { KaraokeView(it) },
-                modifier = Modifier.fillMaxSize(),
-            )
-            // Tocco ovunque per uscire: la vista non intercetta i click, li prende il layout.
-            Column(Modifier.fillMaxSize()) {
-                OutlinedButton(onClick = { karaokeAperto = false }, modifier = Modifier.padding(12.dp)) {
-                    Text("Chiudi")
-                }
+            Box(Modifier.fillMaxSize()) {
+                // Anche il karaoke rispetta gli inserti: senza, titolo e barra finirebbero
+                // sotto l'orologio di sistema e sotto la barra dei gesti.
+                AndroidView(
+                    factory = { KaraokeView(it) },
+                    modifier = Modifier.fillMaxSize().safeDrawingPadding(),
+                )
+                OutlinedButton(
+                    onClick = { karaokeAperto = false },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .safeDrawingPadding()
+                        .padding(12.dp),
+                ) { Text("Chiudi") }
             }
         } else {
             Setup(onApriKaraoke = { karaokeAperto = true })
@@ -87,19 +126,33 @@ class MainActivity : ComponentActivity() {
         var usaSpotify by remember { mutableStateOf(Engine.useSpotifyLyrics) }
         var offset by remember { mutableStateOf(Engine.offsetMs) }
         var esito by remember { mutableStateOf("") }
+        var aggiornamento by remember { mutableStateOf<Release?>(null) }
+        var statoRicerca by remember { mutableStateOf("") }
+
+        // Controllo all'avvio, silenzioso: se non c'e' rete o non c'e' nulla di nuovo,
+        // la scheda non compare e non si vede alcun errore.
+        LaunchedEffect(Unit) {
+            val trovato = withContext(Dispatchers.IO) { UpdateChecker.latest() }
+            if (trovato != null && trovato.versionCode > BuildConfig.VERSION_CODE) {
+                aggiornamento = trovato
+            }
+        }
 
         Column(
             Modifier
                 .fillMaxSize()
+                .safeDrawingPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text("Squarciagola", style = MaterialTheme.typography.headlineMedium)
             Text(
-                "Karaoke dei brani riprodotti da Spotify, sul telefono e su Android Auto.",
-                style = MaterialTheme.typography.bodyMedium,
+                "Versione ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                style = MaterialTheme.typography.bodySmall,
             )
+
+            aggiornamento?.let { SchedaAggiornamento(it) { messaggio -> statoRicerca = messaggio } }
 
             OutlinedTextField(
                 value = clientId,
@@ -167,7 +220,7 @@ class MainActivity : ComponentActivity() {
 
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Sincronia: ${offset} ms")
+                    Text("Sincronia: $offset ms")
                     Text(
                         "Positivo se il testo va in ritardo rispetto all'audio. Il Bluetooth " +
                             "introduce un ritardo che cambia da impianto a impianto.",
@@ -204,7 +257,50 @@ class MainActivity : ComponentActivity() {
                 Text("Apri il karaoke")
             }
 
+            OutlinedButton(
+                onClick = {
+                    statoRicerca = "Controllo in corso"
+                    lifecycleScope.launch {
+                        val trovato = withContext(Dispatchers.IO) { UpdateChecker.latest() }
+                        statoRicerca = when {
+                            trovato == null -> "Impossibile contattare GitHub"
+                            trovato.versionCode > BuildConfig.VERSION_CODE -> {
+                                aggiornamento = trovato
+                                "Disponibile la ${trovato.versionName}"
+                            }
+
+                            else -> "Gia' aggiornata"
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Controlla aggiornamenti") }
+
+            if (statoRicerca.isNotEmpty()) {
+                Text(statoRicerca, style = MaterialTheme.typography.bodySmall)
+            }
             if (esito.isNotEmpty()) Text(esito, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+
+    @Composable
+    private fun SchedaAggiornamento(release: Release, onStato: (String) -> Unit) {
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Aggiornamento disponibile: ${release.versionName}")
+                if (release.notes.isNotBlank()) {
+                    Text(release.notes.take(400), style = MaterialTheme.typography.bodySmall)
+                }
+                Button(onClick = {
+                    if (!Updater.canInstall(this@MainActivity)) {
+                        onStato("Concedi il permesso di installare, poi ripremi Aggiorna")
+                        Updater.openInstallPermissionSettings(this@MainActivity)
+                    } else {
+                        downloadId = Updater.download(this@MainActivity, release)
+                        onStato("Download avviato, l'installazione parte da sola alla fine")
+                    }
+                }) { Text("Aggiorna") }
+            }
         }
     }
 }

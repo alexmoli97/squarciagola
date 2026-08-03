@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Aggiornamento in proprio, senza passare da uno store -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Necessarie per disegnare sulla Surface di Android Auto -->
     <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES" />
