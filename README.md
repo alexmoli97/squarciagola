@@ -1,0 +1,114 @@
+# Squarciagola
+
+Karaoke dei brani riprodotti da Spotify, sullo schermo di Android Auto e su quello del telefono.
+Uso personale, installazione manuale, nessuna pubblicazione su store.
+
+## Cosa fa
+
+Legge dalla Web API di Spotify quale brano sta suonando e a che punto e', recupera il testo
+sincronizzato e lo fa scorrere evidenziando la riga in corso. Lo stesso motore di disegno
+alimenta sia la Surface di Android Auto sia la vista sul telefono.
+
+## Cosa non fa, e perche'
+
+**Nessun widget sulla home di Android Auto.** La home mostra card controllate da Google e non
+esiste API per aggiungerne di terze parti. L'app compare come icona nel launcher di Android Auto.
+
+**Non finira' mai sul Play Store.** Per disegnare liberamente serve una Surface, che l'host
+concede solo alle app di categoria navigazione. Squarciagola si dichiara tale pur non essendo
+un navigatore: funziona in sideload, non supererebbe una review.
+
+**I testi di Spotify sono opzionali e fragili.** Vedi sotto.
+
+## Compilazione
+
+Servono JDK 17 o superiore e l'SDK Android (piattaforma 35).
+
+```bash
+./gradlew :app:assembleDebug     # APK in app/build/outputs/apk/debug/
+./gradlew :app:testDebugUnitTest # test di PositionClock e del parser LRC
+```
+
+Se l'SDK non e' nella posizione predefinita, indicalo in `local.properties` con `sdk.dir=...`.
+
+## Installazione
+
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+Poi, per vederla in auto, in Android Auto sul telefono: tocca dieci volte "Versione" per
+sbloccare le opzioni sviluppatore, quindi attiva **Sorgenti sconosciute**. L'app compare nel
+launcher al collegamento successivo. Per provarla senza salire in macchina si usa il Desktop
+Head Unit dell'SDK.
+
+## Configurazione
+
+### Spotify Web API (obbligatoria)
+
+Serve per sapere cosa sta suonando.
+
+1. Su [developer.spotify.com](https://developer.spotify.com/dashboard) crea un'app.
+2. Aggiungi come Redirect URI esattamente `it.squarciagola://auth`.
+3. Copia il Client ID nel campo corrispondente dell'app e premi **Accedi a Spotify**.
+
+Gli scope richiesti sono `user-read-playback-state` e `user-read-currently-playing`.
+Non serve il client secret: l'autenticazione usa PKCE.
+
+### Testi
+
+Di base i testi arrivano da [LRCLIB](https://lrclib.net): pubblico, senza autenticazione,
+sincronizzato riga per riga. Non c'e' nulla da configurare.
+
+L'interruttore **Usa i testi di Spotify** aggiunge come sorgente primaria l'endpoint interno
+`color-lyrics` del client Spotify, con LRCLIB che resta come riserva automatica.
+Prima di attivarlo, sappi che:
+
+- l'endpoint non fa parte della Web API pubblica e usarlo viola i Termini di Servizio di Spotify
+- richiede il cookie di sessione `sp_dc` del tuo account salvato dentro l'app
+- dal marzo 2025 la richiesta del token del web player richiede un codice TOTP, il cui segreto
+  Spotify ruota periodicamente: a ogni rotazione la sorgente smette di funzionare
+- comporta un rischio, per quanto basso, di provvedimenti sull'account
+
+Quando si rompe non resti a bocca asciutta: la sorgente restituisce "non disponibile" e il
+testo continua ad arrivare da LRCLIB. Te ne accorgi dal fatto che i testi tornano a essere
+quelli di LRCLIB, non da un errore a schermo.
+
+Per configurarla servono due valori presi dal web player:
+
+- **`sp_dc`**: nei cookie di `open.spotify.com` a sessione aperta, negli strumenti per
+  sviluppatori del browser
+- **segreto TOTP**: in esadecimale, insieme al numero di versione corrispondente. Il segreto e'
+  incorporato nel bundle JavaScript del web player; i progetti open source che seguono l'endpoint
+  pubblicano la coppia segreto/versione a ogni rotazione. La versione attesa dal codice e' nella
+  costante `TOTP_VERSION` in `SpotifyLyricsSource.kt` e va tenuta allineata al segreto incollato
+  nelle impostazioni: se divergono, il token viene rifiutato.
+
+### Sincronia
+
+Il Bluetooth introduce un ritardo audio che cambia da impianto a impianto, e la posizione
+riportata da Spotify e' gia' vecchia quando arriva. L'offset si regola dal telefono a passi di
+50 ms e in auto con i due pulsanti sulla barra dei comandi, a passi di 100 ms. Positivo se il
+testo va in ritardo rispetto a quello che senti.
+
+## Come e' fatto
+
+| File | Ruolo |
+|---|---|
+| `playback/PositionClock.kt` | Interpola la posizione tra due poll. Logica pura, testata |
+| `playback/PlaybackPoller.kt` | Poll di `/v1/me/player` ogni 4 secondi |
+| `lyrics/LrcParser.kt` | Parser LRC e ricerca binaria della riga attiva. Testato |
+| `lyrics/LrcLibSource.kt` | Sorgente pubblica, con ricerca di ripiego sui metadati |
+| `lyrics/SpotifyLyricsSource.kt` | Sorgente interna Spotify, TOTP e cookie di sessione |
+| `lyrics/LyricsRepository.kt` | Ordine delle sorgenti e cache su disco, esiti negativi inclusi |
+| `render/KaraokeRenderer.kt` | Tutto il disegno. Non conosce ne' l'auto ne' Compose |
+| `render/KaraokeView.kt` | Contenitore per il telefono |
+| `car/CarSurfaceRenderer.kt` | Contenitore per la Surface dell'auto, 30 fotogrammi al secondo |
+| `Engine.kt` | Stato condiviso tra i due schermi |
+| `PlaybackService.kt` | Foreground service, tiene vivo il polling fuori dal primo piano |
+
+## Stato della verifica
+
+Test unitari eseguiti e verdi: 14 casi su `PositionClock` e sul parser LRC.
+Il resto (rendering, integrazione con Android Auto, flusso OAuth completo) non e' verificabile
+senza dispositivo: va provato con il Desktop Head Unit o in macchina.
