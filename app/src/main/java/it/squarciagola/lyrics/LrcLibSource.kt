@@ -8,14 +8,14 @@ import org.json.JSONObject
 /**
  * Testi da lrclib.net: pubblico, senza autenticazione, sincronizzato per riga.
  *
- * La durata e' parte della chiave di ricerca e serve a distinguere versioni diverse dello
+ * La durata è parte della chiave di ricerca e serve a distinguere versioni diverse dello
  * stesso brano (singolo, album, remaster), quindi va passata sempre.
  */
 class LrcLibSource {
 
     val name = "LRCLIB"
 
-    /** Bloccante: va invocata su Dispatchers.IO. Null se il brano non e' in catalogo. */
+    /** Bloccante: va invocata su Dispatchers.IO. Null se il brano non è in catalogo. */
     fun fetch(track: TrackMeta): Lyrics? {
         val query = Http.encodeForm(
             mapOf(
@@ -31,7 +31,7 @@ class LrcLibSource {
 
     /**
      * La ricerca esatta fallisce quando i metadati di Spotify e quelli di LRCLIB divergono,
-     * cosa frequente su remaster e riedizioni. Si riprova senza album ne' durata prendendo
+     * cosa frequente su remaster e riedizioni. Si riprova senza album né durata prendendo
      * il primo risultato con testo sincronizzato.
      */
     private fun searchFallback(track: TrackMeta): Lyrics? {

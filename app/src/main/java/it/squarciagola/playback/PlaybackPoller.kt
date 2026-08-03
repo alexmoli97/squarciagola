@@ -18,8 +18,8 @@ import org.json.JSONObject
 /**
  * Interroga periodicamente lo stato di riproduzione dell'account Spotify.
  *
- * L'intervallo e' volutamente largo: la posizione tra un poll e l'altro la ricostruisce
- * [PositionClock], quindi interrogare piu' spesso non migliora la sincronia e avvicina
+ * L'intervallo è volutamente largo: la posizione tra un poll e l'altro la ricostruisce
+ * [PositionClock], quindi interrogare più spesso non migliora la sincronia e avvicina
  * soltanto il rate limit.
  */
 class PlaybackPoller(private val auth: SpotifyAuth) {
@@ -55,8 +55,8 @@ class PlaybackPoller(private val auth: SpotifyAuth) {
         val body = Http.get(PLAYER_URL, mapOf("Authorization" to "Bearer $token"))
         val roundTrip = SystemClock.elapsedRealtime() - requestStart
         if (body == null) {
-            // Puo' essere assenza di rete oppure un errore temporaneo: si tiene l'ultimo stato
-            // valido e si riprova al giro dopo, senza azzerare il testo gia' a schermo.
+            // Può essere assenza di rete oppure un errore temporaneo: si tiene l'ultimo stato
+            // valido e si riprova al giro dopo, senza azzerare il testo già a schermo.
             _problem.value = "Nessuna connessione"
             return@withContext
         }
@@ -95,8 +95,8 @@ class PlaybackPoller(private val auth: SpotifyAuth) {
             ),
             progressMs = json.optLong("progress_ms"),
             isPlaying = json.optBoolean("is_playing"),
-            // Il valore letto descrive un istante gia' passato: il server ha risposto a meta'
-            // del viaggio, quindi l'istante di campionamento vero e' mezzo round-trip fa.
+            // Il valore letto descrive un istante già passato: il server ha risposto a metà
+            // del viaggio, quindi l'istante di campionamento vero è mezzo round-trip fa.
             // Questa parte della sincronia si corregge da sola, senza tarature.
             sampledAtElapsedRealtime = SystemClock.elapsedRealtime() - roundTripMs / 2,
         )

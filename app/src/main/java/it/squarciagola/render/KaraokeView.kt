@@ -11,7 +11,7 @@ import it.squarciagola.Engine
 /**
  * Il karaoke sullo schermo del telefono. Stesso renderer usato in auto, altro contenitore.
  *
- * Si ridisegna a ogni vsync solo mentre e' attaccata alla finestra: staccata, il
+ * Si ridisegna a ogni vsync solo mentre è attaccata alla finestra: staccata, il
  * Choreographer viene sganciato e la vista smette di consumare.
  */
 class KaraokeView @JvmOverloads constructor(

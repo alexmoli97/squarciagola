@@ -10,13 +10,13 @@ import android.provider.Settings
 /**
  * Scarica e avvia l'installazione di una nuova versione.
  *
- * ponytail: si appoggia a DownloadManager invece di scaricare a mano. E' un servizio di
+ * ponytail: si appoggia a DownloadManager invece di scaricare a mano. È un servizio di
  * sistema, gestisce da solo notifica di avanzamento, ripresa e rete che va e viene, e
- * restituisce un content URI gia' condivisibile con l'installer, il che evita di dover
+ * restituisce un content URI già condivisibile con l'installer, il che evita di dover
  * configurare un FileProvider.
  *
- * L'installazione vera la fa Android e chiede conferma all'utente: un'app non puo'
- * sostituirsi da sola in silenzio, e va bene cosi'.
+ * L'installazione vera la fa Android e chiede conferma all'utente: un'app non può
+ * sostituirsi da sola in silenzio, e va bene così.
  */
 object Updater {
 
@@ -34,7 +34,7 @@ object Updater {
         return manager(context).enqueue(request)
     }
 
-    /** Apre l'installer di sistema sull'APK scaricato. False se il file non e' disponibile. */
+    /** Apre l'installer di sistema sull'APK scaricato. False se il file non è disponibile. */
     fun install(context: Context, downloadId: Long): Boolean {
         val uri = manager(context).getUriForDownloadedFile(downloadId) ?: return false
         val intent = Intent(Intent.ACTION_VIEW)

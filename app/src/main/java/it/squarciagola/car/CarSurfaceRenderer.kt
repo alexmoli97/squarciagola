@@ -19,7 +19,7 @@ import it.squarciagola.render.KaraokeRenderer
  * senso spingersi oltre, visto che il contenuto cambia poche volte al secondo.
  *
  * Si disegna dentro l'area visibile comunicata dall'host, non sull'intera Surface: parte
- * dello schermo puo' essere coperta dai controlli di sistema, e quello che ci finisce sotto
+ * dello schermo può essere coperta dai controlli di sistema, e quello che ci finisce sotto
  * non lo vede nessuno.
  */
 class CarSurfaceRenderer(private val carContext: CarContext) : DefaultLifecycleObserver, SurfaceCallback {

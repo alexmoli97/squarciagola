@@ -12,8 +12,8 @@ data class TrackMeta(
 /**
  * Istantanea dello stato di riproduzione.
  *
- * [sampledAtElapsedRealtime] e' il valore di SystemClock.elapsedRealtime() nel momento in cui
- * [progressMs] e' stato campionato. Serve a [it.squarciagola.playback.PositionClock] per
+ * [sampledAtElapsedRealtime] è il valore di SystemClock.elapsedRealtime() nel momento in cui
+ * [progressMs] è stato campionato. Serve a [it.squarciagola.playback.PositionClock] per
  * interpolare la posizione tra un poll e l'altro.
  */
 data class PlaybackState(
@@ -46,8 +46,8 @@ sealed interface Lyrics {
 }
 
 /**
- * Tutto cio' che serve a disegnare un fotogramma. Il renderer non conosce nient'altro:
- * ne' Android Auto, ne' Compose, ne' la rete.
+ * Tutto ciò che serve a disegnare un fotogramma. Il renderer non conosce nient'altro:
+ * né Android Auto, né Compose, né la rete.
  */
 data class KaraokeFrame(
     val title: String = "",
@@ -56,7 +56,7 @@ data class KaraokeFrame(
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
     val isPlaying: Boolean = false,
-    /** Da dove arriva il testo mostrato. Vuoto se non c'e' testo. */
+    /** Da dove arriva il testo mostrato. Vuoto se non c'è testo. */
     val source: String = "",
     /** Messaggio che sostituisce il testo quando qualcosa non va (login scaduto, niente rete). */
     val message: String? = null,

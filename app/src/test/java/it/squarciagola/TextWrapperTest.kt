@@ -7,7 +7,7 @@ import org.junit.Test
 
 class TextWrapperTest {
 
-    /** Un carattere vale un'unita': cosi' le larghezze attese si leggono a occhio. */
+    /** Un carattere vale un'unità: così le larghezze attese si leggono a occhio. */
     private val measure: (String) -> Float = { it.length.toFloat() }
 
     private fun wrap(text: String, maxWidth: Float) = TextWrapper.wrap(text, maxWidth, measure)

@@ -10,9 +10,9 @@ import android.content.Intent
 import android.os.IBinder
 
 /**
- * Tiene vivo il polling quando l'app non e' in primo piano.
+ * Tiene vivo il polling quando l'app non è in primo piano.
  *
- * Serve davvero: in Android Auto l'Activity del telefono non e' mai in foreground, e senza
+ * Serve davvero: in Android Auto l'Activity del telefono non è mai in foreground, e senza
  * questo servizio il sistema sospende le coroutine dopo poco, lasciando il testo fermo
  * mentre la musica va avanti.
  */

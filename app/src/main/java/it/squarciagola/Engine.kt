@@ -28,7 +28,7 @@ import kotlinx.coroutines.withContext
  *
  * ponytail: un singleton invece di un contenitore di dipendenze. I consumatori sono due,
  * vivono nello stesso processo e nessuno dei due possiede l'altro; il ciclo di vita utile
- * e' quello del processo. Un framework di injection qui sarebbe impalcatura a vuoto.
+ * è quello del processo. Un framework di injection qui sarebbe impalcatura a vuoto.
  *
  * La posizione nel brano non viene pubblicata su un flusso: la calcolano i disegnatori
  * chiamando [currentFrame] a ogni fotogramma. Emettere trenta volte al secondo su uno

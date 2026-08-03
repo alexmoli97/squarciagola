@@ -15,12 +15,12 @@ import it.squarciagola.model.Lyrics
 /**
  * Disegna un fotogramma del karaoke dentro un rettangolo.
  *
- * Non conosce ne' Android Auto ne' Compose: riceve un Canvas e un'area, e disegna. E' la
+ * Non conosce né Android Auto né Compose: riceve un Canvas e un'area, e disegna. È la
  * ragione per cui lo stesso karaoke gira sullo schermo dell'auto e su quello del telefono
  * senza duplicare nulla.
  *
- * Le due forme sono molto diverse: in auto lo spazio e' largo e basso, sul telefono in
- * verticale e' stretto e alto. Per questo la dimensione del testo tiene conto di entrambe le
+ * Le due forme sono molto diverse: in auto lo spazio è largo e basso, sul telefono in
+ * verticale è stretto e alto. Per questo la dimensione del testo tiene conto di entrambe le
  * misure e le righe lunghe vanno a capo invece di essere troncate.
  *
  * I Paint sono campi e non variabili locali: questo metodo viene invocato trenta volte al
@@ -46,7 +46,7 @@ class KaraokeRenderer {
         ensureBackground(area)
         canvas.drawRect(area, background)
 
-        // Il fattore piu' stretto tra larghezza e altezza: il testo resta leggibile sia sullo
+        // Il fattore più stretto tra larghezza e altezza: il testo resta leggibile sia sullo
         // schermo largo dell'auto sia in verticale sul telefono, senza traboccare da nessuna
         // delle due parti.
         val scale = minOf(area.width() / REFERENCE_WIDTH, area.height() / REFERENCE_HEIGHT)
@@ -56,7 +56,7 @@ class KaraokeRenderer {
         idlePaint.textSize = 22f * scale
 
         // Alone attorno alla riga che si sta cantando: la stacca dalle altre anche con lo
-        // sguardo di sbieco, che in macchina e' l'unico sguardo disponibile.
+        // sguardo di sbieco, che in macchina è l'unico sguardo disponibile.
         // ponytail: shadow layer, non un blur vero. Costa poco su testo corto; se un giorno
         // dovesse pesare, si passa a un livello disegnato a parte.
         activePaint.setShadowLayer(activePaint.textSize * 0.55f, 0f, 0f, COLOR_GLOW)
@@ -85,19 +85,6 @@ class KaraokeRenderer {
             subtitlePaint,
         )
 
-        // Da dove arriva il testo: senza questo non c'e' modo di accorgersi che una sorgente
-        // ha smesso di rispondere e sta lavorando quella di riserva.
-        if (frame.source.isNotEmpty()) {
-            subtitlePaint.color = COLOR_FAR
-            subtitlePaint.textAlign = Paint.Align.RIGHT
-            canvas.drawText(
-                frame.source,
-                area.right - area.width() * 0.05f,
-                area.top + titlePaint.textSize * 1.6f,
-                subtitlePaint,
-            )
-            subtitlePaint.textAlign = Paint.Align.LEFT
-        }
     }
 
     private fun drawBody(canvas: Canvas, area: Rect, frame: KaraokeFrame) {
@@ -186,8 +173,8 @@ class KaraokeRenderer {
         val rowHeight = idlePaint.textSize * ROW_SPACING
         val gap = idlePaint.textSize * 0.5f
 
-        // Testo senza timestamp: si scorre in proporzione alla posizione nel brano. Non e'
-        // sincronia, e' un compromesso onesto per non lasciare fermo un muro di testo.
+        // Testo senza timestamp: si scorre in proporzione alla posizione nel brano. Non è
+        // sincronia, è un compromesso onesto per non lasciare fermo un muro di testo.
         val ratio = if (frame.durationMs > 0) frame.positionMs.toFloat() / frame.durationMs else 0f
         val focus = (ratio * lines.size).toInt().coerceIn(0, lines.size - 1)
 
@@ -217,7 +204,7 @@ class KaraokeRenderer {
         }
     }
 
-    /** Disegna un blocco di righe gia' mandate a capo, saltando quelle fuori dall'area. */
+    /** Disegna un blocco di righe già mandate a capo, saltando quelle fuori dall'area. */
     private fun drawBlock(
         canvas: Canvas,
         area: Rect,
@@ -258,7 +245,7 @@ class KaraokeRenderer {
     private fun wrapFor(text: String, paint: Paint, maxWidth: Float): List<String> =
         TextWrapper.wrap(text, maxWidth) { paint.measureText(it) }
 
-    /** Frazione di riga gia' percorsa, usata per lo scorrimento continuo. */
+    /** Frazione di riga già percorsa, usata per lo scorrimento continuo. */
     private fun scrollShift(lines: List<LyricLine>, active: Int, positionMs: Long): Float {
         if (active < 0 || active + 1 >= lines.size) return 0f
         val remaining = lines[active + 1].timeMs - positionMs
@@ -283,13 +270,24 @@ class KaraokeRenderer {
             area.left + margin, top, area.left + margin + width * ratio, top + height, height, height, barPaint
         )
 
+        val baseline = top + height + subtitlePaint.textSize * 1.3f
         subtitlePaint.color = COLOR_DIM
         canvas.drawText(
             "${clock(frame.positionMs)} / ${clock(frame.durationMs)}",
             area.left + margin,
-            top + height + subtitlePaint.textSize * 1.3f,
+            baseline,
             subtitlePaint,
         )
+
+        // Da dove arriva il testo. Sta in basso e non in alto perché l'angolo in alto a destra
+        // è occupato dal comando di chiusura sul telefono: sovrapposti, non si leggeva né uno
+        // né l'altro.
+        if (frame.source.isNotEmpty()) {
+            subtitlePaint.color = COLOR_FAR
+            subtitlePaint.textAlign = Paint.Align.RIGHT
+            canvas.drawText(frame.source, area.right - margin, baseline, subtitlePaint)
+            subtitlePaint.textAlign = Paint.Align.LEFT
+        }
     }
 
     private fun clock(ms: Long): String {
@@ -309,7 +307,7 @@ class KaraokeRenderer {
         const val ROW_SPACING = 1.28f
         const val SCROLL_LEAD_MS = 260L
 
-        /** Misure di riferimento su cui e' tarata la scala del testo. */
+        /** Misure di riferimento su cui è tarata la scala del testo. */
         const val REFERENCE_WIDTH = 420f
         const val REFERENCE_HEIGHT = 340f
 

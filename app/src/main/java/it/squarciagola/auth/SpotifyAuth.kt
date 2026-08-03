@@ -15,7 +15,7 @@ import java.security.SecureRandom
  *
  * ponytail: PKCE fatto a mano invece di AppAuth. Sono un code verifier, uno scambio e un
  * refresh, in tutto una novantina di righe, contro una dipendenza con la sua configurazione
- * nel manifest. Se un domani servissero piu' provider, AppAuth diventa la scelta giusta.
+ * nel manifest. Se un domani servissero più provider, AppAuth diventa la scelta giusta.
  *
  * I token stanno in EncryptedSharedPreferences: sono credenziali di accesso all'account.
  */
@@ -30,15 +30,15 @@ class SpotifyAuth(context: Context) {
     )
 
     /**
-     * Preso dal build (local.properties) se c'e', altrimenti da quello scritto a mano
-     * nell'app. Il valore nel build vince: e' quello che fa sparire il campo dalla schermata.
+     * Preso dal build (local.properties) se c'è, altrimenti da quello scritto a mano
+     * nell'app. Il valore nel build vince: è quello che fa sparire il campo dalla schermata.
      */
     var clientId: String
         get() = BuildConfig.SPOTIFY_CLIENT_ID.takeIf { it.isNotEmpty() }
             ?: prefs.getString(KEY_CLIENT_ID, "").orEmpty()
         set(value) = prefs.edit().putString(KEY_CLIENT_ID, value.trim()).apply()
 
-    /** True quando il Client ID arriva dal build e non c'e' nulla da chiedere all'utente. */
+    /** True quando il Client ID arriva dal build e non c'è nulla da chiedere all'utente. */
     val clientIdFromBuild: Boolean get() = BuildConfig.SPOTIFY_CLIENT_ID.isNotEmpty()
 
     val isLoggedIn: Boolean get() = prefs.getString(KEY_REFRESH, null) != null
@@ -80,7 +80,7 @@ class SpotifyAuth(context: Context) {
     // --- uso corrente ---------------------------------------------------------------------
 
     /**
-     * Access token valido, rinnovandolo se sta per scadere. Null se non c'e' sessione o se il
+     * Access token valido, rinnovandolo se sta per scadere. Null se non c'è sessione o se il
      * refresh fallisce: in quel caso l'utente deve rifare il login dal telefono.
      * Da chiamare fuori dal main thread.
      */

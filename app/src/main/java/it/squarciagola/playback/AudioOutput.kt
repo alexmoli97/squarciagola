@@ -7,14 +7,14 @@ import android.media.AudioManager
 /**
  * Identifica su cosa sta uscendo l'audio, per tenere una calibrazione separata per impianto.
  *
- * Il ritardo audio non e' misurabile dall'app: sta a valle di Spotify, in un percorso che non
- * controlliamo. L'unica cosa sensata e' non farlo tarare due volte. La chiave e' il nome del
- * dispositivo, cosi' l'impianto della macchina e le cuffie mantengono valori distinti e si
+ * Il ritardo audio non è misurabile dall'app: sta a valle di Spotify, in un percorso che non
+ * controlliamo. L'unica cosa sensata è non farlo tarare due volte. La chiave è il nome del
+ * dispositivo, così l'impianto della macchina e le cuffie mantengono valori distinti e si
  * riapplicano da soli al collegamento.
  */
 object AudioOutput {
 
-    /** Nome leggibile dell'uscita attiva, oppure "telefono" se non c'e' nulla di collegato. */
+    /** Nome leggibile dell'uscita attiva, oppure "telefono" se non c'è nulla di collegato. */
     fun currentName(context: Context): String {
         val manager = context.getSystemService(AudioManager::class.java) ?: return DEFAULT
         val outputs = runCatching { manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS) }

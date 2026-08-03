@@ -89,6 +89,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Engine.init(this)
         handleAuthRedirect(intent)
+        // Con una sessione valida non c'è motivo di far premere un pulsante per iniziare ad
+        // ascoltare: aprire l'app è già la richiesta. Il servizio è idempotente.
+        if (Engine.auth.isLoggedIn) PlaybackService.start(this)
         ContextCompat.registerReceiver(
             this,
             downloadDone,
@@ -108,7 +111,7 @@ class MainActivity : ComponentActivity() {
         handleAuthRedirect(intent)
     }
 
-    /** Ritorno del browser dopo il consenso: nell'URL c'e' il codice da scambiare. */
+    /** Ritorno del browser dopo il consenso: nell'URL c'è il codice da scambiare. */
     private fun handleAuthRedirect(intent: Intent?) {
         val code = intent?.data?.takeIf { it.scheme == "it.squarciagola" }?.getQueryParameter("code")
             ?: return
@@ -153,7 +156,7 @@ class MainActivity : ComponentActivity() {
         var esito by remember { mutableStateOf<String?>(null) }
         var aggiornamento by remember { mutableStateOf<Release?>(null) }
 
-        // Controllo all'avvio, silenzioso: senza rete o senza novita' non compare nulla.
+        // Controllo all'avvio, silenzioso: senza rete o senza novità non compare nulla.
         LaunchedEffect(Unit) {
             val trovato = withContext(Dispatchers.IO) { UpdateChecker.latest() }
             if (trovato != null && trovato.versionCode > BuildConfig.VERSION_CODE) {
@@ -207,13 +210,13 @@ class MainActivity : ComponentActivity() {
             fontWeight = FontWeight.Bold,
         )
         Text(
-            "Le parole giuste al momento giusto. L'intonazione e' affar tuo.",
+            "Le parole giuste al momento giusto. L'intonazione è affar tuo.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 
-    /** Il blocco che risponde alla domanda vera: posso cantare adesso, si' o no. */
+    /** Il blocco che risponde alla domanda vera: posso cantare adesso, sì o no. */
     @Composable
     private fun Adesso(playback: PlaybackState, onCanta: () -> Unit) {
         val track = playback.track
@@ -223,12 +226,14 @@ class MainActivity : ComponentActivity() {
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(Modifier.padding(20.dp)) {
+                // Lo stato è la traccia intera, non il suo id: durante il dissolvimento il
+                // contenuto uscente deve continuare a mostrare il brano vecchio.
                 AnimatedContent(
-                    targetState = track?.id.orEmpty(),
+                    targetState = track,
                     transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(180)) },
                     label = "brano",
-                ) { _ ->
-                    if (track == null) {
+                ) { brano ->
+                    if (brano == null) {
                         Column {
                             Text(
                                 if (Engine.auth.isLoggedIn) "Silenzio in cabina"
@@ -242,6 +247,18 @@ class MainActivity : ComponentActivity() {
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                            // La diagnostica del poller: senza, "Silenzio in cabina" copre sia
+                            // il caso normale sia la sessione scaduta o la rete assente.
+                            Engine.problem.collectAsStateWithLifecycle().value
+                                ?.takeIf { Engine.auth.isLoggedIn }
+                                ?.let {
+                                    Spacer(Modifier.height(6.dp))
+                                    Text(
+                                        it,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
                         }
                     } else {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -249,12 +266,12 @@ class MainActivity : ComponentActivity() {
                             Spacer(Modifier.width(14.dp))
                             Column {
                                 Text(
-                                    track.title,
+                                    brano.title,
                                     style = MaterialTheme.typography.titleLarge,
                                     maxLines = 2,
                                 )
                                 Text(
-                                    track.artist,
+                                    brano.artist,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
@@ -275,7 +292,7 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Tre barrette che si muovono mentre la musica va e si posano quando e' in pausa.
+     * Tre barrette che si muovono mentre la musica va e si posano quando è in pausa.
      * Comunica uno stato, non decora: da lontano si capisce se il polling sta ricevendo.
      */
     @Composable
@@ -410,7 +427,7 @@ class MainActivity : ComponentActivity() {
 
         Column {
             Text(
-                "La latenza di rete e' gia' compensata da sola. Questa manopola copre il " +
+                "La latenza di rete è già compensata da sola. Questa manopola copre il " +
                     "ritardo audio dell'impianto, che nessuna API espone: si tara una volta " +
                     "per uscita e torna da sola al collegamento dopo.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -500,9 +517,9 @@ class MainActivity : ComponentActivity() {
                                 when {
                                     trovato == null -> "GitHub non risponde"
                                     trovato.versionCode > BuildConfig.VERSION_CODE ->
-                                        "C'e' la ${trovato.versionName}, riapri la schermata"
+                                        "C'è la ${trovato.versionName}, riapri la schermata"
 
-                                    else -> "Gia' all'ultima versione"
+                                    else -> "Già all'ultima versione"
                                 }
                             )
                         }

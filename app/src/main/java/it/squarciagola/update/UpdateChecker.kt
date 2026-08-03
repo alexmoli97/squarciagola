@@ -11,14 +11,14 @@ data class Release(
 )
 
 /**
- * Controlla se su GitHub c'e' una versione piu' recente di quella installata.
+ * Controlla se su GitHub c'è una versione più recente di quella installata.
  *
- * Convenzione, unica regola da ricordare: il tag della release e' `v<versionCode>`, cioe'
- * `v2`, `v3` e cosi' via, e alla release e' allegato un file .apk. Il numero nel tag e' quello
+ * Convenzione, unica regola da ricordare: il tag della release è `v<versionCode>`, cioè
+ * `v2`, `v3` e così via, e alla release è allegato un file .apk. Il numero nel tag è quello
  * che viene confrontato con il versionCode dell'app installata.
  *
  * ponytail: nessun server di aggiornamento, nessun file manifest da mantenere a mano.
- * Le release di GitHub espongono gia' tutto quello che serve, e pubblicare significa
+ * Le release di GitHub espongono già tutto quello che serve, e pubblicare significa
  * caricare l'APK su una release nuova.
  */
 object UpdateChecker {

@@ -5,21 +5,28 @@ Uso personale, installazione manuale, nessuna pubblicazione su store.
 
 ## Cosa fa
 
-Legge dalla Web API di Spotify quale brano sta suonando e a che punto e', recupera il testo
+Legge dalla Web API di Spotify quale brano sta suonando e a che punto è, recupera il testo
 sincronizzato e lo fa scorrere evidenziando la riga in corso. Lo stesso motore di disegno
 alimenta sia la Surface di Android Auto sia la vista sul telefono.
 
-## Cosa non fa, e perche'
+## Cosa non fa, e perché
 
 **Nessun widget sulla home di Android Auto.** La home mostra card controllate da Google e non
 esiste API per aggiungerne di terze parti. L'app compare come icona nel launcher di Android Auto.
 
-**Non finira' mai sul Play Store.** Per disegnare liberamente serve una Surface, che l'host
+**Non finirà mai sul Play Store.** Per disegnare liberamente serve una Surface, che l'host
 concede solo alle app di categoria navigazione. Squarciagola si dichiara tale pur non essendo
 un navigatore: funziona in sideload, non supererebbe una review.
 
-**Non usa i testi di Spotify.** Non esistono via API, e la strada non ufficiale e' stata
+**Non usa i testi di Spotify.** Non esistono via API, e la strada non ufficiale è stata
 valutata e scartata. Vedi sotto.
+
+## Documentazione
+
+- [docs/architettura.md](docs/architettura.md): com'è fatta dentro, i vincoli che ne hanno
+  deciso la forma, le alternative scartate
+- [docs/verifica.md](docs/verifica.md): cosa va provato prima di una release, automatico e
+  manuale
 
 ## Compilazione
 
@@ -30,7 +37,7 @@ Servono JDK 17 o superiore e l'SDK Android (piattaforma 35).
 ./gradlew :app:testDebugUnitTest # test di PositionClock e del parser LRC
 ```
 
-Se l'SDK non e' nella posizione predefinita, indicalo in `local.properties` con `sdk.dir=...`.
+Se l'SDK non è nella posizione predefinita, indicalo in `local.properties` con `sdk.dir=...`.
 
 ## Installazione
 
@@ -47,7 +54,7 @@ Head Unit dell'SDK.
 
 ### Spotify Web API (obbligatoria)
 
-Serve per sapere cosa sta suonando. La registrazione dell'app non e' aggirabile: senza un
+Serve per sapere cosa sta suonando. La registrazione dell'app non è aggirabile: senza un
 Client ID non esiste OAuth.
 
 1. Su [developer.spotify.com](https://developer.spotify.com/dashboard) crea un'app.
@@ -59,10 +66,10 @@ spotify.clientId=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 Ricompila e il campo sparisce dalla schermata: resta solo **Accedi a Spotify**. Il Client ID
-in PKCE non e' un segreto, quindi sta tranquillamente nel build; `local.properties` e' comunque
+in PKCE non è un segreto, quindi sta tranquillamente nel build; `local.properties` è comunque
 fuori dal repository.
 
-Chi installa l'APK senza ricompilare trova il campo e puo' incollarlo a mano.
+Chi installa l'APK senza ricompilare trova il campo e può incollarlo a mano.
 
 Gli scope richiesti sono `user-read-playback-state` e `user-read-currently-playing`.
 Non serve il client secret: l'autenticazione usa PKCE.
@@ -70,26 +77,26 @@ Non serve il client secret: l'autenticazione usa PKCE.
 ### Testi
 
 I testi arrivano da [LRCLIB](https://lrclib.net): pubblico, senza autenticazione, sincronizzato
-riga per riga. Non c'e' niente da configurare.
+riga per riga. Non c'è niente da configurare.
 
 Spotify non espone i testi tramite API. Esiste un endpoint interno raggiungibile fingendosi il
-web player, ma la strada e' stata valutata e scartata: costa il cookie di sessione dell'account
+web player, ma la strada è stata valutata e scartata: costa il cookie di sessione dell'account
 dentro l'app, un segreto anti-automazione da rincorrere a ogni rotazione, e una violazione dei
-Termini di Servizio, per ottenere la stessa granularita' di sincronizzazione che LRCLIB da'
+Termini di Servizio, per ottenere la stessa granularità di sincronizzazione che LRCLIB dà
 gratis. Quando LRCLIB non ha un brano, l'app lo dice e passa oltre.
 
 ### Sincronia
 
-Il disallineamento ha due cause, e solo una e' misurabile.
+Il disallineamento ha due cause, e solo una è misurabile.
 
-**Latenza di rete: automatica.** La posizione riportata da Spotify descrive un istante gia'
+**Latenza di rete: automatica.** La posizione riportata da Spotify descrive un istante già
 passato quando la risposta arriva. L'app misura il round-trip di ogni richiesta e colloca
 l'istante di campionamento mezzo round-trip indietro. Nessuna taratura, si adatta da solo al
 variare della connessione.
 
-**Ritardo audio dell'impianto: una taratura per dispositivo.** E' a valle di Spotify, in un
+**Ritardo audio dell'impianto: una taratura per dispositivo.** È a valle di Spotify, in un
 percorso audio che l'app non controlla, e nessuna API lo espone: non esiste modo software di
-misurarlo. Quello che l'app fa e' non farlo tarare due volte, tenendo un valore separato per
+misurarlo. Quello che l'app fa è non farlo tarare due volte, tenendo un valore separato per
 ogni uscita audio (impianto dell'auto, cuffie, altoparlante del telefono). Calibri una volta e
 al collegamento successivo il valore torna da solo.
 
@@ -99,26 +106,26 @@ telefono mostra a quale uscita si riferisce il valore che stai modificando.
 
 ### Interfaccia
 
-Tema scuro unico, per la schermata e per il karaoke. Non e' una preferenza estetica: quest'app
+Tema scuro unico, per la schermata e per il karaoke. Non è una preferenza estetica: quest'app
 si guarda al buio, in macchina di sera o col telefono nel supporto, e uno schermo chiaro in
 quelle condizioni acceca.
 
-Il verde menta e' l'unico accento e non viene mai speso per decorare: marca la riga che si sta
+Il verde menta è l'unico accento e non viene mai speso per decorare: marca la riga che si sta
 cantando e l'azione principale della schermata. Le tre barrette accanto al titolo si muovono
-mentre la musica va e si posano in pausa, cosi' da lontano si vede se il polling sta ricevendo;
+mentre la musica va e si posano in pausa, così da lontano si vede se il polling sta ricevendo;
 seguono l'impostazione di sistema per la rimozione delle animazioni.
 
-In alto a destra nel karaoke c'e' scritto da dove arriva il testo, e se e' sincronizzato o no.
+In alto a destra nel karaoke c'è scritto da dove arriva il testo, e se è sincronizzato o no.
 
 ## Aggiornamenti senza store
 
-L'app si aggiorna da sola dalle release di GitHub. Non c'e' server, non c'e' manifest da
+L'app si aggiorna da sola dalle release di GitHub. Non c'è server, non c'è manifest da
 mantenere: pubblicare una versione significa creare una release con l'APK allegato.
 
-**Regola unica**: il tag della release e' `v<versionCode>`, e quel numero deve coincidere con
+**Regola unica**: il tag della release è `v<versionCode>`, e quel numero deve coincidere con
 il `versionCode` in `app/build.gradle.kts`. Release `v3` vuol dire `versionCode = 3`.
 
-Il repository di riferimento e' la costante `REPOSITORY` in `update/UpdateChecker.kt`.
+Il repository di riferimento è la costante `REPOSITORY` in `update/UpdateChecker.kt`.
 Va messa sul tuo repo prima della prima release, altrimenti il controllo cerca un indirizzo
 che non esiste.
 
@@ -126,20 +133,28 @@ che non esiste.
 
 ```bash
 # 1. alza versionCode e versionName in app/build.gradle.kts
-./gradlew :app:assembleDebug
-gh release create v3 app/build/outputs/apk/debug/app-debug.apk --title "0.3" --notes "Cosa cambia"
+./release.sh "Cosa cambia in questa versione"
 ```
+
+Il tag non si passa a mano di proposito: lo script lo ricava dal `versionCode` dichiarato nel
+build. È l'unico errore capace di rompere l'aggiornamento in silenzio, e toglierlo di mezzo
+costa meno che accorgersene dopo.
+
+Prima di pubblicare lo script rifiuta di procedere se non sei su `main`, se ci sono modifiche
+non committate, se il tag esiste già o se il `versionCode` non è superiore all'ultima release.
+Poi esegue `./check.sh`, pubblica, e alla fine rilegge l'API di GitHub per controllare che la
+release sia davvero come l'app se la aspetta.
 
 ### Cosa succede sul telefono
 
-All'apertura l'app interroga GitHub in silenzio: se non c'e' rete o non c'e' niente di nuovo
-non compare nulla. Quando trova una versione con numero piu' alto mostra una scheda con le
-note di rilascio e il pulsante **Aggiorna**. C'e' anche **Controlla aggiornamenti** per
+All'apertura l'app interroga GitHub in silenzio: se non c'è rete o non c'è niente di nuovo
+non compare nulla. Quando trova una versione con numero più alto mostra una scheda con le
+note di rilascio e il pulsante **Aggiorna**. C'è anche **Controlla aggiornamenti** per
 forzare il controllo a mano.
 
 Premendo Aggiorna il download passa da DownloadManager, con la sua notifica di avanzamento, e
 al termine parte l'installer di sistema. La conferma finale la chiede Android: un'app non
-puo' sostituirsi da sola in silenzio.
+può sostituirsi da sola in silenzio.
 
 La prima volta serve concedere a Squarciagola il permesso di installare app ("Installa app
 sconosciute"). Il pulsante ci porta direttamente nella schermata giusta; concesso il permesso,
@@ -149,7 +164,7 @@ Le firme devono combaciare: se cambi il keystore fra una versione e l'altra, And
 l'aggiornamento e va disinstallata e reinstallata. Restando sulla build di debug il problema
 non si pone.
 
-## Come e' fatto
+## Come è fatto
 
 | File | Ruolo |
 |---|---|
@@ -159,7 +174,7 @@ non si pone.
 | `lyrics/LrcLibSource.kt` | Sorgente dei testi, con ricerca di ripiego sui metadati |
 | `lyrics/LyricsRepository.kt` | Cache su disco, esiti negativi inclusi |
 | `ui/Theme.kt` | Schema colori Material 3, solo scuro |
-| `render/KaraokeRenderer.kt` | Tutto il disegno. Non conosce ne' l'auto ne' Compose |
+| `render/KaraokeRenderer.kt` | Tutto il disegno. Non conosce né l'auto né Compose |
 | `render/TextWrapper.kt` | Righe lunghe mandate a capo. Testato senza framework grafico |
 | `update/UpdateChecker.kt` | Legge l'ultima release da GitHub. Testato |
 | `update/Updater.kt` | Download e avvio dell'installer di sistema |
@@ -174,5 +189,5 @@ Test unitari eseguiti e verdi: 27 casi su `PositionClock`, parser LRC, `TextWrap
 `UpdateChecker`.
 
 Il resto (rendering a schermo, integrazione con Android Auto, flusso OAuth completo, download e
-installazione dell'aggiornamento) non e' verificabile senza dispositivo: va provato a mano, con
+installazione dell'aggiornamento) non è verificabile senza dispositivo: va provato a mano, con
 il Desktop Head Unit o in macchina.

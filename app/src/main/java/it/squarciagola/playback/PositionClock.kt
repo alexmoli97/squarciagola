@@ -5,7 +5,7 @@ import it.squarciagola.model.PlaybackState
 /**
  * Ricava la posizione corrente nel brano interpolando tra due campionamenti della Web API.
  *
- * Logica pura e senza dipendenze Android proprio per poterla testare: e' il punto in cui un
+ * Logica pura e senza dipendenze Android proprio per poterla testare: è il punto in cui un
  * difetto non si vede, si sente soltanto come testo fuori sincrono.
  */
 object PositionClock {

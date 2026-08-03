@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.dp
  * Solo scuro, e non per estetica: quest'app si guarda al buio, in macchina di sera o col
  * telefono nel supporto in abitacolo. Uno schermo chiaro in quelle condizioni acceca.
  *
- * Il verde menta non e' decorazione, e' l'unico accento: marca la riga che si sta cantando
+ * Il verde menta non è decorazione, è l'unico accento: marca la riga che si sta cantando
  * nel karaoke e l'azione principale nella schermata. Tutto il resto vive di neutri.
  */
 private val SquarciagolaColors = darkColorScheme(

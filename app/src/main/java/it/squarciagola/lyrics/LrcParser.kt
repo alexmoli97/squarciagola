@@ -5,7 +5,7 @@ import it.squarciagola.model.LyricLine
 /**
  * Parser del formato LRC.
  *
- * Regge i casi che si incontrano davvero: piu' timestamp sulla stessa riga (ritornelli),
+ * Regge i casi che si incontrano davvero: più timestamp sulla stessa riga (ritornelli),
  * centesimi o millesimi di secondo, tag di metadata da ignorare, righe vuote che nel
  * formato indicano le pause strumentali e vanno conservate.
  */

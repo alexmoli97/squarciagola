@@ -3,7 +3,7 @@ package it.squarciagola.render
 /**
  * Manda a capo una riga di testo entro una larghezza data.
  *
- * La misura arriva da fuori invece di usare Paint direttamente: cosi' la logica di
+ * La misura arriva da fuori invece di usare Paint direttamente: così la logica di
  * spezzatura resta verificabile con un test normale, senza dipendere dal framework grafico.
  */
 object TextWrapper {
@@ -25,8 +25,8 @@ object TextWrapper {
                 rows.add(current)
                 current = ""
             }
-            // Parola piu' larga della riga intera: si spezza a forza, altrimenti sparirebbe
-            // oltre il bordo. Capita con i titoli piu' che con i testi, ma capita.
+            // Parola più larga della riga intera: si spezza a forza, altrimenti sparirebbe
+            // oltre il bordo. Capita con i titoli più che con i testi, ma capita.
             var remaining = word
             while (measure(remaining) > maxWidth && remaining.length > 1) {
                 var cut = remaining.length
