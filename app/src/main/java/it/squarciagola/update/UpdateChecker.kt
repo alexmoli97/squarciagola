@@ -24,7 +24,7 @@ data class Release(
 object UpdateChecker {
 
     /** Proprietario e nome del repository. Si cambia qui, una volta sola. */
-    const val REPOSITORY = "alessiomolinaro/squarciagola"
+    const val REPOSITORY = "alexmoli97/squarciagola"
 
     /** Bloccante: va invocata su Dispatchers.IO. Null se non si riesce a sapere. */
     fun latest(): Release? {
