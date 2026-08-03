@@ -46,10 +46,11 @@ class KaraokeRenderer {
         ensureBackground(area)
         canvas.drawRect(area, background)
 
-        // Il fattore più stretto tra larghezza e altezza: il testo resta leggibile sia sullo
-        // schermo largo dell'auto sia in verticale sul telefono, senza traboccare da nessuna
-        // delle due parti.
-        val scale = minOf(area.width() / REFERENCE_WIDTH, area.height() / REFERENCE_HEIGHT)
+        // La scala nasce dalla larghezza, che è il vincolo vero per il testo, e viene limitata
+        // dall'altezza della sola fascia utile: intestazione e barra non partecipano, altrimenti
+        // su uno schermo alto il testo resterebbe piccolo per far posto a spazio vuoto.
+        val prima = minOf(area.width() / REFERENCE_WIDTH, area.height() / REFERENCE_HEIGHT)
+        val scale = minOf(area.width() / REFERENCE_WIDTH, contentHeight(area, prima) / REFERENCE_CONTENT)
         titlePaint.textSize = 19f * scale
         subtitlePaint.textSize = 14f * scale
         activePaint.textSize = 28f * scale
@@ -62,8 +63,28 @@ class KaraokeRenderer {
         activePaint.setShadowLayer(activePaint.textSize * 0.55f, 0f, 0f, COLOR_GLOW)
 
         drawHeader(canvas, area, frame)
-        drawBody(canvas, area, frame)
+        drawBody(canvas, contentArea(area), frame)
         drawProgress(canvas, area, frame)
+    }
+
+    /** Altezza della fascia di testo, con i Paint dimensionati a una scala di prova. */
+    private fun contentHeight(area: Rect, scaleDiProva: Float): Float =
+        area.height() - (19f * 1.6f + 14f * 2.4f + 14f * 3.2f) * scaleDiProva
+
+    /**
+     * La fascia in cui vive il testo: quello che resta fra l'intestazione e la barra di
+     * avanzamento. Il karaoke si centra qui dentro, non sullo schermo intero, altrimenti
+     * resta un vuoto sotto il titolo e il testo si accalca sopra la barra.
+     */
+    private fun contentArea(area: Rect): Rect {
+        val header = titlePaint.textSize * 1.6f + subtitlePaint.textSize * 2.4f
+        val progress = subtitlePaint.textSize * 3.2f
+        return Rect(
+            area.left,
+            (area.top + header).toInt(),
+            area.right,
+            (area.bottom - progress).toInt(),
+        )
     }
 
     private fun drawHeader(canvas: Canvas, area: Rect, frame: KaraokeFrame) {
@@ -89,7 +110,7 @@ class KaraokeRenderer {
 
     private fun drawBody(canvas: Canvas, area: Rect, frame: KaraokeFrame) {
         val centerX = area.exactCenterX()
-        val centerY = area.exactCenterY() + area.height() * 0.03f
+        val centerY = area.exactCenterY()
 
         when (val lyrics = frame.lyrics) {
             is Lyrics.Synced -> drawSynced(canvas, area, lyrics.lines, frame.positionMs, centerX, centerY)
@@ -137,8 +158,11 @@ class KaraokeRenderer {
             drawBlock(canvas, area, activeRows, activeTop, activeRowHeight, activePaint, COLOR_ACTIVE, centerX)
         }
 
+        // Quante righe di contorno stiano non lo decide una costante ma lo spazio: si riempie
+        // finché c'è fascia disponibile. Sullo schermo alto del telefono si vede molto contesto,
+        // su quello basso dell'auto poche righe, senza due tarature separate.
         var top = activeTop
-        for (offset in 1..VISIBLE_ABOVE) {
+        for (offset in 1..MAX_BLOCKS) {
             val index = active - offset
             if (index < 0) break
             val rows = wrapFor(lines[index].text, idlePaint, maxWidth)
@@ -148,7 +172,7 @@ class KaraokeRenderer {
         }
 
         var bottom = activeTop + activeHeight
-        for (offset in 1..VISIBLE_BELOW) {
+        for (offset in 1..MAX_BLOCKS) {
             val index = active + offset
             if (index !in lines.indices) break
             val rows = wrapFor(lines[index].text, idlePaint, maxWidth)
@@ -183,7 +207,7 @@ class KaraokeRenderer {
         drawBlock(canvas, area, focusRows, focusTop, rowHeight, idlePaint, COLOR_ACTIVE, centerX)
 
         var top = focusTop
-        for (offset in 1..VISIBLE_ABOVE) {
+        for (offset in 1..MAX_BLOCKS) {
             val index = focus - offset
             if (index < 0) break
             val rows = wrapFor(lines[index], idlePaint, maxWidth)
@@ -193,7 +217,7 @@ class KaraokeRenderer {
         }
 
         var bottom = focusTop + focusRows.size * rowHeight
-        for (offset in 1..VISIBLE_BELOW) {
+        for (offset in 1..MAX_BLOCKS) {
             val index = focus + offset
             if (index >= lines.size) break
             val rows = wrapFor(lines[index], idlePaint, maxWidth)
@@ -302,14 +326,15 @@ class KaraokeRenderer {
     }
 
     private companion object {
-        const val VISIBLE_ABOVE = 3
-        const val VISIBLE_BELOW = 4
+        /** Tetto di sicurezza al riempimento: il limite vero è lo spazio disponibile. */
+        const val MAX_BLOCKS = 14
         const val ROW_SPACING = 1.28f
         const val SCROLL_LEAD_MS = 260L
 
         /** Misure di riferimento su cui è tarata la scala del testo. */
-        const val REFERENCE_WIDTH = 420f
+        const val REFERENCE_WIDTH = 360f
         const val REFERENCE_HEIGHT = 340f
+        const val REFERENCE_CONTENT = 235f
 
         const val COLOR_BACKGROUND = 0xFF0B0B0F.toInt()
         const val COLOR_BACKGROUND_TOP = 0xFF111A15.toInt()

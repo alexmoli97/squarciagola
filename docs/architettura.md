@@ -209,6 +209,13 @@ Scelte che contano:
   ciclo infinito il taglio.
 - **Layout a blocchi, non a righe fisse.** Una riga di testo può occuparne tre a schermo, e
   lo scorrimento continuo sposta il blocco intero.
+- **Il testo vive in una fascia, non sullo schermo intero.** Si centra fra intestazione e
+  barra di avanzamento: centrarlo sull'area completa lasciava un vuoto sotto il titolo e
+  schiacciava le righe sopra la barra.
+- **Quante righe di contorno si vedono lo decide lo spazio**, non una costante: si riempie
+  finché c'è fascia. Sul telefono in verticale si vede molto contesto, sullo schermo basso
+  dell'auto poche righe, senza due tarature separate. La costante che resta è solo un tetto
+  di sicurezza al ciclo.
 - **Paint come campi, non variabili locali.** Il metodo gira trenta volte al secondo e
   allocare nel ciclo di disegno si vede.
 - **Alone sulla riga corrente** (`setShadowLayer`), per staccarla con lo sguardo di sbieco.
