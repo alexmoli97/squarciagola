@@ -8,6 +8,7 @@ import it.squarciagola.lyrics.LyricsRepository
 import it.squarciagola.model.KaraokeFrame
 import it.squarciagola.model.Lyrics
 import it.squarciagola.model.PlaybackState
+import it.squarciagola.playback.AppRemoteSource
 import it.squarciagola.playback.AudioOutput
 import it.squarciagola.playback.PlaybackPoller
 import it.squarciagola.playback.PositionClock
@@ -45,14 +46,26 @@ object Engine {
         private set
     private lateinit var repository: LyricsRepository
     private lateinit var poller: PlaybackPoller
+    private lateinit var appRemote: AppRemoteSource
 
     private val _lyrics = MutableStateFlow<Lyrics>(Lyrics.None)
     val lyrics: StateFlow<Lyrics> = _lyrics.asStateFlow()
 
     private val _artwork = MutableStateFlow<android.graphics.Bitmap?>(null)
 
-    val playback: StateFlow<PlaybackState> get() = poller.state
-    val problem: StateFlow<String?> get() = poller.problem
+    /**
+     * Stato unificato: lo alimenta App Remote quando c'e' l'app Spotify sul dispositivo,
+     * altrimenti il polling della Web API. Chi disegna non sa quale delle due stia lavorando.
+     */
+    private val _playback = MutableStateFlow(PlaybackState.IDLE)
+    val playback: StateFlow<PlaybackState> = _playback.asStateFlow()
+
+    private val _problem = MutableStateFlow<String?>(null)
+    val problem: StateFlow<String?> = _problem.asStateFlow()
+
+    /** Da dove arriva lo stato di riproduzione, per la diagnostica in schermata. */
+    private val _origine = MutableStateFlow("")
+    val origine: StateFlow<String> = _origine.asStateFlow()
 
     /**
      * Compensazione del ritardo audio, tenuta separata per dispositivo di uscita.
@@ -92,18 +105,67 @@ object Engine {
         appContext = context.applicationContext
         auth = SpotifyAuth(appContext)
         poller = PlaybackPoller(auth)
+        // Il Client ID si legge quando serve, non alla partenza: puo' essere incollato
+        // nell'app dopo l'avvio, e catturarlo qui lo bloccherebbe al valore vuoto.
+        appRemote = AppRemoteSource({ auth.clientId }, scope)
         repository = LyricsRepository(appContext.filesDir, LrcLibSource())
     }
 
-    fun start() {
-        if (running?.isActive == true) return
+    /**
+     * Avvia l'ascolto. Si prova prima App Remote: dove c'e' l'app Spotify, la posizione arriva
+     * spinta e senza rete di mezzo. Dove non c'e', come sui televisori, si ripiega sul polling
+     * della Web API senza che l'utente debba scegliere niente.
+     *
+     * Il contesto conta: al primo collegamento l'app Spotify deve poter mostrare la richiesta
+     * di autorizzazione, e per farlo serve un'Activity. Dal servizio si passa comunque, e in
+     * quel caso funziona solo se l'autorizzazione e' gia' stata concessa.
+     */
+    fun start(context: Context = appContext) {
+        if (running?.isActive == true || avviando) return
+        avviando = true
+        appRemote.connect(context) { riuscito ->
+            avviando = false
+            if (riuscito) avviaConAppRemote() else avviaConWebApi()
+        }
+    }
+
+    private var avviando = false
+
+    private fun avviaConAppRemote() {
+        running?.cancel()
+        _origine.value = "App Remote"
+        _problem.value = null
+        android.util.Log.i(TAG, "Sorgente: App Remote, aggiornamenti spinti dall'app Spotify")
+        running = scope.launch {
+            launch { appRemote.state.collect { _playback.value = it } }
+            launch { appRemote.artwork.collect { _artwork.value = it } }
+            launch {
+                appRemote.state
+                    .map { it.track?.id }
+                    .distinctUntilChanged()
+                    .collect { loadLyricsForCurrentTrack(caricaCopertina = false) }
+            }
+            // Se l'app Spotify viene chiusa la connessione cade: si torna alla Web API invece
+            // di restare fermi su un ultimo stato che non si aggiorna piu'.
+            launch {
+                appRemote.connected.collect { collegato -> if (!collegato) avviaConWebApi() }
+            }
+        }
+    }
+
+    private fun avviaConWebApi() {
+        running?.cancel()
+        _origine.value = "Web API"
+        android.util.Log.i(TAG, "Sorgente: Web API, App Remote non disponibile")
         running = scope.launch {
             launch { poller.run() }
+            launch { poller.state.collect { _playback.value = it } }
+            launch { poller.problem.collect { _problem.value = it } }
             launch {
                 poller.state
                     .map { it.track?.id }
                     .distinctUntilChanged()
-                    .collect { loadLyricsForCurrentTrack() }
+                    .collect { loadLyricsForCurrentTrack(caricaCopertina = true) }
             }
         }
     }
@@ -111,6 +173,8 @@ object Engine {
     fun stop() {
         running?.cancel()
         running = null
+        appRemote.disconnect()
+        _origine.value = ""
     }
 
     /** Fotogramma corrente, pronto per il renderer. */
@@ -142,26 +206,34 @@ object Engine {
         }
     }
 
-    private suspend fun loadLyricsForCurrentTrack() {
+    /**
+     * @param caricaCopertina falso quando la copertina arriva gia' da App Remote, che la
+     * consegna come Bitmap senza bisogno di scaricarla.
+     */
+    private suspend fun loadLyricsForCurrentTrack(caricaCopertina: Boolean = true) {
         val track = playback.value.track
         if (track == null) {
             _lyrics.value = Lyrics.None
-            _artwork.value = null
+            if (caricaCopertina) _artwork.value = null
             return
         }
         _lyrics.value = Lyrics.Loading
         // La copertina non blocca il testo: arriva quando arriva, e finche' manca lo sfondo
         // resta quello scuro di sempre.
-        scope.launch(Dispatchers.IO) {
-            _artwork.value = track.artworkUrl.takeIf { it.isNotEmpty() }?.let { AlbumArt.load(it) }
+        if (caricaCopertina) {
+            scope.launch(Dispatchers.IO) {
+                _artwork.value = track.artworkUrl.takeIf { it.isNotEmpty() }?.let { AlbumArt.load(it) }
+            }
         }
         _lyrics.value = withContext(Dispatchers.IO) { repository.load(track) }
     }
+
 
     private fun offsetKey() = "$KEY_OFFSET_PREFIX$outputName"
 
     private fun prefs() = appContext.getSharedPreferences("squarciagola", Context.MODE_PRIVATE)
 
+    private const val TAG = "Squarciagola"
     private const val KEY_OFFSET_PREFIX = "offset_ms_"
     private const val OUTPUT_CACHE_MS = 2_000L
 }

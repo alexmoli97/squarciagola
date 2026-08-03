@@ -89,6 +89,30 @@ Chi installa l'APK senza ricompilare trova il campo e può incollarlo a mano.
 Gli scope richiesti sono `user-read-playback-state` e `user-read-currently-playing`.
 Non serve il client secret: l'autenticazione usa PKCE.
 
+### App Remote (opzionale, migliora la sincronia)
+
+Dove c'e' l'app Spotify sul dispositivo, Squarciagola preferisce leggere lo stato di
+riproduzione da lei invece che dalla Web API: gli aggiornamenti arrivano spinti e in locale,
+quindi non c'e' latenza di rete da compensare ne' polling da tarare. Serve Spotify Premium.
+
+Perche' funzioni, sul dashboard di Spotify vanno registrati package e impronta della firma:
+**Edit Settings**, sezione **Android Packages**.
+
+| Campo | Valore |
+|---|---|
+| Package name | `it.squarciagola` |
+| SHA-1 (build di debug) | ricavabile con il comando qui sotto |
+
+```bash
+keytool -list -v -keystore ~/.android/debug.keystore \
+  -alias androiddebugkey -storepass android -keypass android | grep SHA1
+```
+
+Al primo avvio dopo la registrazione, l'app Spotify chiede l'autorizzazione: va concessa una
+volta. Fino ad allora, e su qualunque dispositivo senza l'app Spotify (i televisori), si usa
+la Web API senza che nulla smetta di funzionare. Quale delle due stia lavorando e' scritto in
+fondo alla schermata, accanto al numero di versione.
+
 ### Testi
 
 I testi arrivano da [LRCLIB](https://lrclib.net): pubblico, senza autenticazione, sincronizzato

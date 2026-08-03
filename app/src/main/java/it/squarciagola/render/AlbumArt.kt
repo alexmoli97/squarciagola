@@ -46,8 +46,28 @@ object AlbumArt {
         if (ridotta == null) return null
 
         val sfocata = runCatching { blur(ridotta) }.getOrNull() ?: ridotta
+        if (sfocata !== ridotta) ridotta.recycle()
 
         urlInCache = url
+        bitmapInCache = sfocata
+        return sfocata
+    }
+
+    /**
+     * Sfoca una copertina gia' disponibile come Bitmap, come quella che consegna App Remote.
+     * La chiave serve solo a non rifare il lavoro sullo stesso brano.
+     */
+    @Synchronized
+    fun blurred(chiave: String, source: Bitmap): Bitmap? {
+        if (chiave == urlInCache) return bitmapInCache
+
+        val ridotta = runCatching { Bitmap.createScaledBitmap(source, LATO, LATO, true) }
+            .getOrNull() ?: return null
+        val sfocata = runCatching { blur(ridotta) }.getOrNull() ?: ridotta
+        // Solo la copia ridotta e' nostra: quella ricevuta da App Remote appartiene all'SDK.
+        if (sfocata !== ridotta && ridotta !== source) ridotta.recycle()
+
+        urlInCache = chiave
         bitmapInCache = sfocata
         return sfocata
     }
@@ -76,9 +96,9 @@ object AlbumArt {
             mediaVerticale(appoggio, pixels, w, h)
         }
 
+        // Non si ricicla la sorgente: puo' non appartenerci. Lo fa chi l'ha creata.
         val risultato = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         risultato.setPixels(pixels, 0, w, 0, 0, w, h)
-        if (risultato !== source) source.recycle()
         return risultato
     }
 

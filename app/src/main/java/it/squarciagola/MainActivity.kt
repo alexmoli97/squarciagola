@@ -90,9 +90,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Engine.init(this)
         handleAuthRedirect(intent)
-        // Con una sessione valida non c'è motivo di far premere un pulsante per iniziare ad
-        // ascoltare: aprire l'app è già la richiesta. Il servizio è idempotente.
-        if (Engine.auth.isLoggedIn) PlaybackService.start(this)
         ContextCompat.registerReceiver(
             this,
             downloadDone,
@@ -100,6 +97,20 @@ class MainActivity : ComponentActivity() {
             ContextCompat.RECEIVER_EXPORTED,
         )
         setContent { SquarciagolaTheme { Root() } }
+    }
+
+    /**
+     * L'ascolto parte qui e non in onCreate: al primo collegamento l'app Spotify deve
+     * mostrare la richiesta di autorizzazione, e per farlo la finestra deve essere gia' in
+     * primo piano. In onCreate il dialogo non comparirebbe e la connessione fallirebbe
+     * chiedendo proprio quell'autorizzazione.
+     *
+     * App Remote non richiede l'accesso OAuth: anche senza sessione Web API l'app puo' gia'
+     * sapere cosa sta suonando. La chiamata e' protetta contro il doppio avvio.
+     */
+    override fun onResume() {
+        super.onResume()
+        Engine.start(this)
     }
 
     override fun onDestroy() {
@@ -159,6 +170,13 @@ class MainActivity : ComponentActivity() {
         val playback by Engine.playback.collectAsStateWithLifecycle()
         var esito by remember { mutableStateOf<String?>(null) }
         var aggiornamento by remember { mutableStateOf<Release?>(null) }
+
+        // Il servizio si avvia quando una delle due sorgenti ha attaccato: prima sarebbe una
+        // notifica persistente per un ascolto che non sta avvenendo.
+        val origine by Engine.origine.collectAsStateWithLifecycle()
+        LaunchedEffect(origine) {
+            if (origine.isNotEmpty()) PlaybackService.start(this@MainActivity)
+        }
 
         // Controllo all'avvio, silenzioso: senza rete o senza novità non compare nulla.
         LaunchedEffect(Unit) {
@@ -487,6 +505,7 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun Manutenzione(onEsito: (String) -> Unit) {
+        val sorgente by Engine.origine.collectAsStateWithLifecycle()
         Column {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FilledTonalButton(
@@ -533,7 +552,8 @@ class MainActivity : ComponentActivity() {
             }
             Spacer(Modifier.height(6.dp))
             Text(
-                "Versione ${BuildConfig.VERSION_NAME} · testi da LRCLIB",
+                "Versione ${BuildConfig.VERSION_NAME} · testi da LRCLIB" +
+                    if (sorgente.isEmpty()) "" else " · riproduzione da $sorgente",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
