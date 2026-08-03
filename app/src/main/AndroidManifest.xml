@@ -18,6 +18,13 @@
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
+    <!-- Da Android 11 un'app non vede gli altri pacchetti se non li dichiara. Senza questo
+         l'SDK di Spotify non riesce a raggiungere l'app Spotify e la connessione resta
+         appesa senza errore, che e' il peggiore dei fallimenti possibili. -->
+    <queries>
+        <package android:name="com.spotify.music" />
+    </queries>
+
     <application
         android:name=".SquarciagolaApp"
         android:allowBackup="false"

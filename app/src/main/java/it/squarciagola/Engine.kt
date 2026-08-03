@@ -16,6 +16,7 @@ import it.squarciagola.render.AlbumArt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -121,11 +122,30 @@ object Engine {
      * quel caso funziona solo se l'autorizzazione e' gia' stata concessa.
      */
     fun start(context: Context = appContext) {
-        if (running?.isActive == true || avviando) return
+        if (avviando || appRemote.connected.value) return
         avviando = true
+        // Si ritenta App Remote a ogni ritorno in primo piano, anche se la Web API sta gia'
+        // lavorando: e' quello che permette di passare alla sorgente migliore appena diventa
+        // disponibile, per esempio dopo aver concesso l'autorizzazione o riaperto Spotify.
+        // Senza questo, chi parte una volta sulla Web API ci resta per sempre.
         appRemote.connect(context) { riuscito ->
             avviando = false
-            if (riuscito) avviaConAppRemote() else avviaConWebApi()
+            when {
+                riuscito -> avviaConAppRemote()
+                running?.isActive != true -> avviaConWebApi()
+            }
+        }
+
+        // Rete di sicurezza: se la connessione non risponde ne' si' ne' no, si parte comunque
+        // con la Web API. Restare in attesa significherebbe nessuna sorgente attiva e uno
+        // schermo fermo senza spiegazione, che e' peggio di una sincronia meno precisa.
+        scope.launch {
+            delay(ATTESA_APP_REMOTE_MS)
+            if (avviando && running?.isActive != true) {
+                android.util.Log.i(TAG, "App Remote non risponde entro l'attesa, passo alla Web API")
+                avviando = false
+                avviaConWebApi()
+            }
         }
     }
 
@@ -234,6 +254,7 @@ object Engine {
     private fun prefs() = appContext.getSharedPreferences("squarciagola", Context.MODE_PRIVATE)
 
     private const val TAG = "Squarciagola"
+    private const val ATTESA_APP_REMOTE_MS = 6_000L
     private const val KEY_OFFSET_PREFIX = "offset_ms_"
     private const val OUTPUT_CACHE_MS = 2_000L
 }
