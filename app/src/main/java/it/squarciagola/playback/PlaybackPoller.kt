@@ -92,6 +92,7 @@ class PlaybackPoller(private val auth: SpotifyAuth) {
                 artist = artist,
                 album = item.optJSONObject("album")?.optString("name").orEmpty(),
                 durationMs = item.optLong("duration_ms"),
+                artworkUrl = smallestArtwork(item.optJSONObject("album")),
             ),
             progressMs = json.optLong("progress_ms"),
             isPlaying = json.optBoolean("is_playing"),
@@ -100,6 +101,16 @@ class PlaybackPoller(private val auth: SpotifyAuth) {
             // Questa parte della sincronia si corregge da sola, senza tarature.
             sampledAtElapsedRealtime = SystemClock.elapsedRealtime() - roundTripMs / 2,
         )
+    }
+
+    /**
+     * Spotify elenca le copertine dalla piu' grande alla piu' piccola. Si prende l'ultima:
+     * finisce sfocata a una manciata di pixel, scaricarne una da 640 sarebbe solo traffico.
+     */
+    private fun smallestArtwork(album: JSONObject?): String {
+        val images = album?.optJSONArray("images") ?: return ""
+        if (images.length() == 0) return ""
+        return images.optJSONObject(images.length() - 1)?.optString("url").orEmpty()
     }
 
     private companion object {

@@ -11,6 +11,7 @@ import it.squarciagola.model.PlaybackState
 import it.squarciagola.playback.AudioOutput
 import it.squarciagola.playback.PlaybackPoller
 import it.squarciagola.playback.PositionClock
+import it.squarciagola.render.AlbumArt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -47,6 +48,8 @@ object Engine {
 
     private val _lyrics = MutableStateFlow<Lyrics>(Lyrics.None)
     val lyrics: StateFlow<Lyrics> = _lyrics.asStateFlow()
+
+    private val _artwork = MutableStateFlow<android.graphics.Bitmap?>(null)
 
     val playback: StateFlow<PlaybackState> get() = poller.state
     val problem: StateFlow<String?> get() = poller.problem
@@ -122,6 +125,7 @@ object Engine {
             positionMs = PositionClock.positionMs(state, SystemClock.elapsedRealtime(), offsetMs),
             durationMs = track?.durationMs ?: 0L,
             isPlaying = state.isPlaying,
+            artwork = _artwork.value,
             source = when (lyrics) {
                 is Lyrics.Synced -> lyrics.source
                 is Lyrics.Plain -> "${lyrics.source}, non sincronizzato"
@@ -142,9 +146,15 @@ object Engine {
         val track = playback.value.track
         if (track == null) {
             _lyrics.value = Lyrics.None
+            _artwork.value = null
             return
         }
         _lyrics.value = Lyrics.Loading
+        // La copertina non blocca il testo: arriva quando arriva, e finche' manca lo sfondo
+        // resta quello scuro di sempre.
+        scope.launch(Dispatchers.IO) {
+            _artwork.value = track.artworkUrl.takeIf { it.isNotEmpty() }?.let { AlbumArt.load(it) }
+        }
         _lyrics.value = withContext(Dispatchers.IO) { repository.load(track) }
     }
 

@@ -7,6 +7,8 @@ data class TrackMeta(
     val artist: String,
     val album: String,
     val durationMs: Long,
+    /** Copertina piu' piccola offerta da Spotify: serve solo come sfondo sfocato. */
+    val artworkUrl: String = "",
 )
 
 /**
@@ -56,6 +58,8 @@ data class KaraokeFrame(
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
     val isPlaying: Boolean = false,
+    /** Copertina gia' ridotta, disegnata sfocata dietro al testo. Null se non disponibile. */
+    val artwork: android.graphics.Bitmap? = null,
     /** Da dove arriva il testo mostrato. Vuoto se non c'è testo. */
     val source: String = "",
     /** Messaggio che sostituisce il testo quando qualcosa non va (login scaduto, niente rete). */

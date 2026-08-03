@@ -43,6 +43,8 @@ class KaraokeRenderer {
     }
     private val idlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     private val barPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val artworkPaint = Paint(Paint.FILTER_BITMAP_FLAG)
+    private val scrimPaint = Paint()
 
     private var layout: Layout? = null
     private var scroll = 0f
@@ -50,6 +52,7 @@ class KaraokeRenderer {
 
     fun draw(canvas: Canvas, area: Rect, frame: KaraokeFrame) {
         if (area.width() <= 0 || area.height() <= 0) return
+        drawArtwork(canvas, area, frame)
         ensureBackground(area)
         canvas.drawRect(area, background)
 
@@ -99,7 +102,10 @@ class KaraokeRenderer {
     private fun drawHeader(canvas: Canvas, area: Rect, frame: KaraokeFrame) {
         if (frame.title.isEmpty()) return
         val left = area.left + area.width() * 0.05f
-        val maxWidth = area.width() * 0.9f
+        // L'angolo in alto a destra non e' disponibile: sul telefono ci sta il comando di
+        // chiusura, in auto la barra dei comandi dell'host. Titolo e artista si fermano prima
+        // e vengono troncati, invece di finire sotto qualcosa e diventare illeggibili.
+        val maxWidth = area.width() * HEADER_WIDTH_RATIO
         titlePaint.color = COLOR_TITLE
         subtitlePaint.color = COLOR_DIM
         canvas.drawText(
@@ -160,8 +166,14 @@ class KaraokeRenderer {
     private fun drawScroller(canvas: Canvas, area: Rect, layout: Layout, active: Int) {
         if (layout.blocks.isEmpty()) return
 
-        val destinazione = if (active in layout.blocks.indices) {
-            layout.tops[active] + layout.heights[active] / 2f
+        // Le pause strumentali sono righe vuote nel file LRC. Se la telecamera ci si centrasse
+        // sopra resterebbe uno schermo vuoto e nessuna riga evidenziata proprio mentre lo
+        // strumentale scorre: si resta invece sull'ultima riga cantata.
+        var fuoco = active
+        while (fuoco >= 0 && layout.blocks[fuoco].isEmpty()) fuoco--
+
+        val destinazione = if (fuoco in layout.blocks.indices) {
+            layout.tops[fuoco] + layout.heights[fuoco] / 2f
         } else {
             // Prima che il brano attacchi, le prime righe stanno sotto il centro: si vede che
             // sta per cominciare invece di trovarsi la prima riga già a metà schermo.
@@ -176,10 +188,10 @@ class KaraokeRenderer {
             val top = originY + layout.tops[indice]
             if (top + layout.heights[indice] < area.top) continue
             if (top > area.bottom) break
-            val paint = if (indice == active) activePaint else idlePaint
+            val paint = if (indice == fuoco) activePaint else idlePaint
             drawBlock(
                 canvas, area, layout.blocks[indice], top, layout.rowHeight, paint,
-                colorePer(indice - active), centerX,
+                colorePer(indice - fuoco), centerX,
             )
         }
     }
@@ -257,7 +269,9 @@ class KaraokeRenderer {
         }
 
         val gap = idlePaint.textSize * 0.5f
-        val blocks = testi.map { wrapFor(it, maxWidth) }
+        // Una riga vuota non occupa una riga intera: resta il solo distacco fra i blocchi,
+        // altrimenti ogni pausa strumentale aprirebbe una voragine in mezzo allo schermo.
+        val blocks = testi.map { if (it.isBlank()) emptyList() else wrapFor(it, maxWidth) }
         val tops = FloatArray(blocks.size)
         val heights = FloatArray(blocks.size)
         var y = 0f
@@ -322,6 +336,30 @@ class KaraokeRenderer {
     }
 
     /**
+     * La copertina, ridotta a pochi pixel, ridisegnata a schermo intero: l'ingrandimento con
+     * filtro bilineare produce la sfocatura senza calcolarla.
+     *
+     * Sopra ci va comunque il velo scuro: qui si legge un testo guidando, e una copertina
+     * chiara sotto parole bianche renderebbe l'app inutile proprio quando serve. Il colore
+     * dell'album si intuisce, non domina.
+     */
+    private fun drawArtwork(canvas: Canvas, area: Rect, frame: KaraokeFrame) {
+        val bitmap = frame.artwork
+        if (bitmap == null || bitmap.isRecycled) {
+            background.alpha = 255
+            return
+        }
+        artworkPaint.isFilterBitmap = true
+        canvas.drawBitmap(bitmap, null, area, artworkPaint)
+        // Velo nero pieno, poi il gradiente sopra in trasparenza. Il nero garantisce un
+        // pavimento di contrasto che non dipende da quanto e' chiara la copertina: il colore
+        // dell'album si intuisce, il testo resta leggibile su qualunque immagine.
+        scrimPaint.color = COLOR_SCRIM
+        canvas.drawRect(area, scrimPaint)
+        background.alpha = ARTWORK_SCRIM_ALPHA
+    }
+
+    /**
      * Sfondo con una velatura verde appena accennata in alto, ricalcolata solo quando l'area
      * cambia: costruire uno shader a ogni fotogramma sarebbe spreco.
      */
@@ -352,12 +390,21 @@ class KaraokeRenderer {
         const val ROW_SPACING = 1.28f
         const val LYRIC_SIZE = 25f
 
+        /** Quanta larghezza puo' occupare l'intestazione prima dell'angolo riservato. */
+        const val HEADER_WIDTH_RATIO = 0.68f
+
         /** Costante di tempo della telecamera: piu' alta, piu' morbido e piu' lento. */
         const val TAU = 0.11f
 
         const val REFERENCE_WIDTH = 360f
         const val REFERENCE_HEIGHT = 340f
         const val REFERENCE_CONTENT = 235f
+
+        /** Quanto resta del gradiente sopra la copertina velata. */
+        const val ARTWORK_SCRIM_ALPHA = 150
+
+        /** Velo nero sotto il gradiente: e' lui a garantire il contrasto minimo del testo. */
+        const val COLOR_SCRIM = 0xBE000000.toInt()
 
         const val COLOR_BACKGROUND = 0xFF0B0B0F.toInt()
         const val COLOR_BACKGROUND_TOP = 0xFF111A15.toInt()

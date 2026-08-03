@@ -19,6 +19,23 @@ object Http {
     fun get(url: String, headers: Map<String, String> = emptyMap()): String? =
         request("GET", url, headers, null, null)
 
+    /** Come [get] ma per contenuti binari, cioè le copertine. */
+    fun getBytes(url: String): ByteArray? {
+        var conn: HttpURLConnection? = null
+        return try {
+            conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                connectTimeout = TIMEOUT_MS
+                readTimeout = TIMEOUT_MS
+                setRequestProperty("User-Agent", USER_AGENT)
+            }
+            if (conn.responseCode !in 200..299) null else conn.inputStream.use { it.readBytes() }
+        } catch (e: IOException) {
+            null
+        } finally {
+            conn?.disconnect()
+        }
+    }
+
     fun postForm(url: String, form: Map<String, String>, headers: Map<String, String> = emptyMap()): String? =
         request("POST", url, headers, encodeForm(form), "application/x-www-form-urlencoded")
 
