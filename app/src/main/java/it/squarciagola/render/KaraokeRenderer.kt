@@ -7,10 +7,12 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.Shader
 import android.graphics.Typeface
+import android.os.SystemClock
 import it.squarciagola.lyrics.LrcParser
 import it.squarciagola.model.KaraokeFrame
 import it.squarciagola.model.LyricLine
 import it.squarciagola.model.Lyrics
+import kotlin.math.exp
 
 /**
  * Disegna un fotogramma del karaoke dentro un rettangolo.
@@ -19,11 +21,12 @@ import it.squarciagola.model.Lyrics
  * ragione per cui lo stesso karaoke gira sullo schermo dell'auto e su quello del telefono
  * senza duplicare nulla.
  *
- * Le due forme sono molto diverse: in auto lo spazio è largo e basso, sul telefono in
- * verticale è stretto e alto. Per questo la dimensione del testo tiene conto di entrambe le
- * misure e le righe lunghe vanno a capo invece di essere troncate.
+ * Lo scorrimento è una telecamera che insegue: a ogni fotogramma la posizione corrente si
+ * avvicina a quella di destinazione di una frazione che dipende dal tempo trascorso. Non ci
+ * sono salti perché non c'è nessun istante in cui qualcosa "scatta": il movimento è sempre in
+ * corso, e cambiare riga sposta soltanto la destinazione.
  *
- * I Paint sono campi e non variabili locali: questo metodo viene invocato trenta volte al
+ * I Paint sono campi e non variabili locali: questo metodo viene invocato decine di volte al
  * secondo e allocare nel ciclo di disegno si vede.
  */
 class KaraokeRenderer {
@@ -41,6 +44,10 @@ class KaraokeRenderer {
     private val idlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     private val barPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
+    private var layout: Layout? = null
+    private var scroll = 0f
+    private var lastFrameUptime = 0L
+
     fun draw(canvas: Canvas, area: Rect, frame: KaraokeFrame) {
         if (area.width() <= 0 || area.height() <= 0) return
         ensureBackground(area)
@@ -49,18 +56,20 @@ class KaraokeRenderer {
         // La scala nasce dalla larghezza, che è il vincolo vero per il testo, e viene limitata
         // dall'altezza della sola fascia utile: intestazione e barra non partecipano, altrimenti
         // su uno schermo alto il testo resterebbe piccolo per far posto a spazio vuoto.
-        val prima = minOf(area.width() / REFERENCE_WIDTH, area.height() / REFERENCE_HEIGHT)
-        val scale = minOf(area.width() / REFERENCE_WIDTH, contentHeight(area, prima) / REFERENCE_CONTENT)
+        val provvisoria = minOf(area.width() / REFERENCE_WIDTH, area.height() / REFERENCE_HEIGHT)
+        val scale = minOf(
+            area.width() / REFERENCE_WIDTH,
+            contentHeight(area, provvisoria) / REFERENCE_CONTENT,
+        )
         titlePaint.textSize = 19f * scale
         subtitlePaint.textSize = 14f * scale
-        activePaint.textSize = 28f * scale
-        idlePaint.textSize = 22f * scale
 
-        // Alone attorno alla riga che si sta cantando: la stacca dalle altre anche con lo
-        // sguardo di sbieco, che in macchina è l'unico sguardo disponibile.
-        // ponytail: shadow layer, non un blur vero. Costa poco su testo corto; se un giorno
-        // dovesse pesare, si passa a un livello disegnato a parte.
-        activePaint.setShadowLayer(activePaint.textSize * 0.55f, 0f, 0f, COLOR_GLOW)
+        // Riga attiva e righe di contorno hanno la stessa dimensione di proposito. Cambiarla
+        // fra le due significherebbe rifare il layout a ogni cambio riga, e il riflusso si
+        // vedrebbe come uno scatto. L'evidenziazione la portano grassetto, colore e alone.
+        activePaint.textSize = LYRIC_SIZE * scale
+        idlePaint.textSize = LYRIC_SIZE * scale
+        activePaint.setShadowLayer(activePaint.textSize * 0.5f, 0f, 0f, COLOR_GLOW)
 
         drawHeader(canvas, area, frame)
         drawBody(canvas, contentArea(area), frame)
@@ -105,130 +114,92 @@ class KaraokeRenderer {
             area.top + titlePaint.textSize * 1.6f + subtitlePaint.textSize * 1.5f,
             subtitlePaint,
         )
-
     }
 
     private fun drawBody(canvas: Canvas, area: Rect, frame: KaraokeFrame) {
-        val centerX = area.exactCenterX()
-        val centerY = area.exactCenterY()
-
         when (val lyrics = frame.lyrics) {
-            is Lyrics.Synced -> drawSynced(canvas, area, lyrics.lines, frame.positionMs, centerX, centerY)
-            is Lyrics.Plain -> drawPlain(canvas, area, lyrics, frame, centerX, centerY)
+            is Lyrics.Synced -> {
+                val current = layoutFor(lyrics, lyrics.lines.map { it.text }, area)
+                drawScroller(canvas, area, current, LrcParser.activeIndex(lyrics.lines, frame.positionMs))
+            }
+
+            is Lyrics.Plain -> {
+                val righe = lyrics.text.lines().map { it.trim() }
+                val current = layoutFor(lyrics, righe, area)
+                // Senza timestamp si scorre in proporzione alla posizione nel brano. Non è
+                // sincronia, è un compromesso per non lasciare fermo un muro di testo.
+                val ratio =
+                    if (frame.durationMs > 0) frame.positionMs.toFloat() / frame.durationMs else 0f
+                val focus = (ratio * righe.size).toInt().coerceIn(0, (righe.size - 1).coerceAtLeast(0))
+                drawScroller(canvas, area, current, focus)
+            }
+
             else -> {
+                layout = null
                 idlePaint.color = COLOR_DIM
                 val text = frame.message ?: if (frame.title.isEmpty()) "Silenzio in cabina"
                 else "Di questo brano non si trova il testo"
+                val rows = wrapFor(text, area.width() * 0.9f)
+                val rowHeight = idlePaint.textSize * ROW_SPACING
                 drawBlock(
-                    canvas, area,
-                    wrapFor(text, idlePaint, area.width() * 0.9f),
-                    centerY - idlePaint.textSize,
-                    idlePaint.textSize * ROW_SPACING,
-                    idlePaint, COLOR_DIM, centerX,
+                    canvas, area, rows,
+                    area.exactCenterY() - rows.size * rowHeight / 2f,
+                    rowHeight, idlePaint, COLOR_DIM, area.exactCenterX(),
                 )
             }
         }
     }
 
-    private fun drawSynced(
-        canvas: Canvas,
-        area: Rect,
-        lines: List<LyricLine>,
-        positionMs: Long,
-        centerX: Float,
-        centerY: Float,
-    ) {
-        if (lines.isEmpty()) return
-        val active = LrcParser.activeIndex(lines, positionMs)
-        val maxWidth = area.width() * 0.92f
-        val activeRowHeight = activePaint.textSize * ROW_SPACING
-        val idleRowHeight = idlePaint.textSize * ROW_SPACING
-        val gap = idlePaint.textSize * 0.5f
+    /**
+     * Disegna il testo scorrevole con la telecamera che insegue il blocco attivo.
+     *
+     * Si scorrono tutte le righe a ogni fotogramma, ma senza rifare la mandata a capo: quella
+     * sta nel layout in cache. Restano confronti su un centinaio di numeri, niente di
+     * misurabile.
+     */
+    private fun drawScroller(canvas: Canvas, area: Rect, layout: Layout, active: Int) {
+        if (layout.blocks.isEmpty()) return
 
-        val activeRows =
-            if (active in lines.indices) wrapFor(lines[active].text, activePaint, maxWidth) else emptyList()
-        val activeHeight = activeRows.size * activeRowHeight
-
-        // Scorrimento continuo: nell'ultimo tratto prima della riga successiva il blocco si
-        // sposta gradualmente verso l'alto, invece di saltare di colpo.
-        val shift = scrollShift(lines, active, positionMs) * (activeHeight + gap)
-        val activeTop = centerY - activeHeight / 2f - shift
-
-        if (activeRows.isNotEmpty()) {
-            drawBlock(canvas, area, activeRows, activeTop, activeRowHeight, activePaint, COLOR_ACTIVE, centerX)
+        val destinazione = if (active in layout.blocks.indices) {
+            layout.tops[active] + layout.heights[active] / 2f
+        } else {
+            // Prima che il brano attacchi, le prime righe stanno sotto il centro: si vede che
+            // sta per cominciare invece di trovarsi la prima riga già a metà schermo.
+            -area.height() * 0.22f
         }
 
-        // Quante righe di contorno stiano non lo decide una costante ma lo spazio: si riempie
-        // finché c'è fascia disponibile. Sullo schermo alto del telefono si vede molto contesto,
-        // su quello basso dell'auto poche righe, senza due tarature separate.
-        var top = activeTop
-        for (offset in 1..MAX_BLOCKS) {
-            val index = active - offset
-            if (index < 0) break
-            val rows = wrapFor(lines[index].text, idlePaint, maxWidth)
-            top -= gap + rows.size * idleRowHeight
-            if (top + rows.size * idleRowHeight < area.top) break
-            drawBlock(canvas, area, rows, top, idleRowHeight, idlePaint, colorFor(offset), centerX)
-        }
+        avanzaTelecamera(destinazione)
 
-        var bottom = activeTop + activeHeight
-        for (offset in 1..MAX_BLOCKS) {
-            val index = active + offset
-            if (index !in lines.indices) break
-            val rows = wrapFor(lines[index].text, idlePaint, maxWidth)
-            bottom += gap
-            if (bottom > area.bottom) break
-            drawBlock(canvas, area, rows, bottom, idleRowHeight, idlePaint, colorFor(offset), centerX)
-            bottom += rows.size * idleRowHeight
+        val originY = area.exactCenterY() - scroll
+        val centerX = area.exactCenterX()
+        for (indice in layout.blocks.indices) {
+            val top = originY + layout.tops[indice]
+            if (top + layout.heights[indice] < area.top) continue
+            if (top > area.bottom) break
+            val paint = if (indice == active) activePaint else idlePaint
+            drawBlock(
+                canvas, area, layout.blocks[indice], top, layout.rowHeight, paint,
+                colorePer(indice - active), centerX,
+            )
         }
     }
 
-    private fun drawPlain(
-        canvas: Canvas,
-        area: Rect,
-        lyrics: Lyrics.Plain,
-        frame: KaraokeFrame,
-        centerX: Float,
-        centerY: Float,
-    ) {
-        val lines = lyrics.text.lines().map { it.trim() }
-        if (lines.isEmpty()) return
-        val maxWidth = area.width() * 0.92f
-        val rowHeight = idlePaint.textSize * ROW_SPACING
-        val gap = idlePaint.textSize * 0.5f
+    /**
+     * Smorzamento esponenziale verso la destinazione, indipendente dalla cadenza dei
+     * fotogrammi: sul telefono si disegna a ogni vsync, in auto ogni 33 ms, e il movimento
+     * deve durare uguale.
+     */
+    private fun avanzaTelecamera(destinazione: Float) {
+        val adesso = SystemClock.uptimeMillis()
+        val trascorso = if (lastFrameUptime == 0L) 0L else adesso - lastFrameUptime
+        lastFrameUptime = adesso
 
-        // Testo senza timestamp: si scorre in proporzione alla posizione nel brano. Non è
-        // sincronia, è un compromesso onesto per non lasciare fermo un muro di testo.
-        val ratio = if (frame.durationMs > 0) frame.positionMs.toFloat() / frame.durationMs else 0f
-        val focus = (ratio * lines.size).toInt().coerceIn(0, lines.size - 1)
-
-        val focusRows = wrapFor(lines[focus], idlePaint, maxWidth)
-        val focusTop = centerY - focusRows.size * rowHeight / 2f
-        drawBlock(canvas, area, focusRows, focusTop, rowHeight, idlePaint, COLOR_ACTIVE, centerX)
-
-        var top = focusTop
-        for (offset in 1..MAX_BLOCKS) {
-            val index = focus - offset
-            if (index < 0) break
-            val rows = wrapFor(lines[index], idlePaint, maxWidth)
-            top -= gap + rows.size * rowHeight
-            if (top + rows.size * rowHeight < area.top) break
-            drawBlock(canvas, area, rows, top, rowHeight, idlePaint, colorFor(offset), centerX)
-        }
-
-        var bottom = focusTop + focusRows.size * rowHeight
-        for (offset in 1..MAX_BLOCKS) {
-            val index = focus + offset
-            if (index >= lines.size) break
-            val rows = wrapFor(lines[index], idlePaint, maxWidth)
-            bottom += gap
-            if (bottom > area.bottom) break
-            drawBlock(canvas, area, rows, bottom, rowHeight, idlePaint, colorFor(offset), centerX)
-            bottom += rows.size * rowHeight
-        }
+        // Fotogramma perso, app tornata in primo piano, schermo riacceso: senza limite la
+        // telecamera farebbe un balzo. Meglio un recupero rapido ma continuo.
+        val dt = (trascorso / 1000f).coerceIn(0f, 0.12f)
+        scroll += (destinazione - scroll) * (1f - exp(-dt / TAU))
     }
 
-    /** Disegna un blocco di righe già mandate a capo, saltando quelle fuori dall'area. */
     private fun drawBlock(
         canvas: Canvas,
         area: Rect,
@@ -242,40 +213,77 @@ class KaraokeRenderer {
         paint.color = color
         rows.forEachIndexed { index, row ->
             if (row.isEmpty()) return@forEachIndexed
-            val baseline = top + rowHeight * (index + 0.82f)
-            if (baseline < area.top + paint.textSize || baseline > area.bottom) return@forEachIndexed
+            val baseline = top + rowHeight * (index + 0.8f)
+            if (baseline < area.top || baseline > area.bottom + rowHeight) return@forEachIndexed
             canvas.drawText(row, centerX, baseline, paint)
         }
     }
 
-    private fun colorFor(offset: Int) = if (offset == 1) COLOR_NEAR else COLOR_FAR
+    /** Le righe sfumano allontanandosi da quella attiva, cosi' l'occhio trova subito il centro. */
+    private fun colorePer(distanza: Int): Int = when (distanza) {
+        0 -> COLOR_ACTIVE
+        -1, 1 -> COLOR_NEAR
+        -2, 2 -> COLOR_FAR
+        else -> COLOR_FAINT
+    }
+
+    // --- layout ---------------------------------------------------------------------------
 
     /**
-     * Sfondo con una velatura verde appena accennata in alto, ricalcolata solo quando l'area
-     * cambia: costruire uno shader a ogni fotogramma sarebbe spreco.
+     * Posizioni verticali di tutte le righe, calcolate una volta sola.
+     *
+     * Mandare a capo l'intero testo a ogni fotogramma sarebbe lo spreco che rende scattoso
+     * il disegno; qui si rifà solo quando cambia il brano o cambiano le dimensioni.
      */
-    private fun ensureBackground(area: Rect) {
-        if (area == gradientArea) return
-        background.shader = LinearGradient(
-            area.exactCenterX(), area.top.toFloat(),
-            area.exactCenterX(), area.bottom.toFloat(),
-            intArrayOf(COLOR_BACKGROUND_TOP, COLOR_BACKGROUND, COLOR_BACKGROUND),
-            floatArrayOf(0f, 0.5f, 1f),
-            Shader.TileMode.CLAMP,
-        )
-        gradientArea = Rect(area)
+    private class Layout(
+        val identita: Any,
+        val larghezza: Int,
+        val rowHeight: Float,
+        val blocks: List<List<String>>,
+        val tops: FloatArray,
+        val heights: FloatArray,
+    )
+
+    private fun layoutFor(identita: Any, testi: List<String>, area: Rect): Layout {
+        val maxWidth = area.width() * 0.92f
+        val rowHeight = idlePaint.textSize * ROW_SPACING
+        val esistente = layout
+        if (esistente != null &&
+            esistente.identita === identita &&
+            esistente.larghezza == area.width() &&
+            esistente.rowHeight == rowHeight
+        ) {
+            return esistente
+        }
+
+        val gap = idlePaint.textSize * 0.5f
+        val blocks = testi.map { wrapFor(it, maxWidth) }
+        val tops = FloatArray(blocks.size)
+        val heights = FloatArray(blocks.size)
+        var y = 0f
+        blocks.forEachIndexed { indice, rows ->
+            tops[indice] = y
+            heights[indice] = rows.size * rowHeight
+            y += heights[indice] + gap
+        }
+
+        val nuovo = Layout(identita, area.width(), rowHeight, blocks, tops, heights)
+        layout = nuovo
+        // Brano nuovo o schermo ruotato: la telecamera si posiziona di colpo invece di
+        // arrivarci scorrendo da dove si trovava per il brano precedente.
+        scroll = if (blocks.isEmpty()) 0f else tops[0] + heights[0] / 2f
+        lastFrameUptime = 0L
+        return nuovo
     }
 
-    private fun wrapFor(text: String, paint: Paint, maxWidth: Float): List<String> =
-        TextWrapper.wrap(text, maxWidth) { paint.measureText(it) }
+    /**
+     * Si misura sempre con il Paint in grassetto, anche per le righe normali: cosi' il layout
+     * non cambia quando una riga diventa quella attiva e il testo in grassetto non trabocca.
+     */
+    private fun wrapFor(text: String, maxWidth: Float): List<String> =
+        TextWrapper.wrap(text, maxWidth) { activePaint.measureText(it) }
 
-    /** Frazione di riga già percorsa, usata per lo scorrimento continuo. */
-    private fun scrollShift(lines: List<LyricLine>, active: Int, positionMs: Long): Float {
-        if (active < 0 || active + 1 >= lines.size) return 0f
-        val remaining = lines[active + 1].timeMs - positionMs
-        if (remaining >= SCROLL_LEAD_MS || remaining < 0) return 0f
-        return 1f - remaining / SCROLL_LEAD_MS.toFloat()
-    }
+    // --- cornice --------------------------------------------------------------------------
 
     private fun drawProgress(canvas: Canvas, area: Rect, frame: KaraokeFrame) {
         if (frame.durationMs <= 0) return
@@ -304,14 +312,29 @@ class KaraokeRenderer {
         )
 
         // Da dove arriva il testo. Sta in basso e non in alto perché l'angolo in alto a destra
-        // è occupato dal comando di chiusura sul telefono: sovrapposti, non si leggeva né uno
-        // né l'altro.
+        // è occupato dal comando di chiusura sul telefono.
         if (frame.source.isNotEmpty()) {
             subtitlePaint.color = COLOR_FAR
             subtitlePaint.textAlign = Paint.Align.RIGHT
             canvas.drawText(frame.source, area.right - margin, baseline, subtitlePaint)
             subtitlePaint.textAlign = Paint.Align.LEFT
         }
+    }
+
+    /**
+     * Sfondo con una velatura verde appena accennata in alto, ricalcolata solo quando l'area
+     * cambia: costruire uno shader a ogni fotogramma sarebbe spreco.
+     */
+    private fun ensureBackground(area: Rect) {
+        if (area == gradientArea) return
+        background.shader = LinearGradient(
+            area.exactCenterX(), area.top.toFloat(),
+            area.exactCenterX(), area.bottom.toFloat(),
+            intArrayOf(COLOR_BACKGROUND_TOP, COLOR_BACKGROUND, COLOR_BACKGROUND),
+            floatArrayOf(0f, 0.5f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        gradientArea = Rect(area)
     }
 
     private fun clock(ms: Long): String {
@@ -326,12 +349,12 @@ class KaraokeRenderer {
     }
 
     private companion object {
-        /** Tetto di sicurezza al riempimento: il limite vero è lo spazio disponibile. */
-        const val MAX_BLOCKS = 14
         const val ROW_SPACING = 1.28f
-        const val SCROLL_LEAD_MS = 260L
+        const val LYRIC_SIZE = 25f
 
-        /** Misure di riferimento su cui è tarata la scala del testo. */
+        /** Costante di tempo della telecamera: piu' alta, piu' morbido e piu' lento. */
+        const val TAU = 0.11f
+
         const val REFERENCE_WIDTH = 360f
         const val REFERENCE_HEIGHT = 340f
         const val REFERENCE_CONTENT = 235f
@@ -342,7 +365,8 @@ class KaraokeRenderer {
         const val COLOR_TITLE = Color.WHITE
         const val COLOR_ACTIVE = 0xFF7BE3A3.toInt()
         const val COLOR_NEAR = 0xFFD8D8DE.toInt()
-        const val COLOR_FAR = 0xFF6A6A75.toInt()
+        const val COLOR_FAR = 0xFF7E7E8A.toInt()
+        const val COLOR_FAINT = 0xFF55555F.toInt()
         const val COLOR_DIM = 0xFF9A9AA5.toInt()
         const val COLOR_BAR_BACKGROUND = 0xFF2A2A33.toInt()
     }
