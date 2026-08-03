@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Banner del launcher di Android TV: rapporto fisso 320x180. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path
+        android:fillColor="#0B0B0F"
+        android:pathData="M0,0h320v180h-320z" />
+    <path
+        android:fillColor="#7BE3A3"
+        android:pathData="M40,58h6v64h-6z" />
+    <path
+        android:fillColor="#7BE3A3"
+        android:pathData="M54,42h6v96h-6z" />
+    <path
+        android:fillColor="#7BE3A3"
+        android:pathData="M68,66h6v48h-6z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M96,74h4v32h-4zM104,66h4v48h-4zM112,80h4v20h-4zM120,58h4v64h-4zM128,72h4v36h-4z" />
+    <path
+        android:fillColor="#6A6A75"
+        android:pathData="M150,86h130v4h-130zM150,100h96v4h-96z" />
+</vector>

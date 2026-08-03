@@ -310,6 +310,41 @@ Rendering, integrazione con Android Auto, giro OAuth completo e installazione
 dell'aggiornamento non sono verificabili in automatico. La procedura manuale è in
 [verifica.md](verifica.md).
 
+## Sfondo dalla copertina
+
+La copertina dell'album, sfocata, sta dietro al testo. La sfocatura e' calcolata: tre passate
+di media mobile separabile su un'immagine ridotta a 160 pixel di lato, orizzontale e poi
+verticale, cosi' il costo cresce con il raggio e non con il suo quadrato. Si paga una volta
+per brano su un thread di I/O, mai nel ciclo di disegno.
+
+La scorciatoia ovvia, ridurre a pochi pixel e lasciare che l'ingrandimento faccia da
+sfumatura, e' stata provata e scartata: produce un mosaico, si riconoscono i quadrati e non
+la fotografia.
+
+RenderEffect sarebbe la strada nativa, ma vuole API 31 e un canvas accelerato, e in Android
+Auto si disegna su una Surface con lockCanvas, che accelerata non e'. Sarebbero due
+implementazioni per lo stesso risultato.
+
+Sopra l'immagine va un velo nero pieno, poi il gradiente in trasparenza. Il nero garantisce
+un pavimento di contrasto che non dipende da quanto e' chiara la copertina. Per la stessa
+ragione i grigi delle righe di contorno sono chiari: una gerarchia costruita con toni scuri
+diventa testo illeggibile appena l'album e' luminoso.
+
+## Piu' schermi, una sola app
+
+Telefono, Android Auto e televisore sono la stessa applicazione. Il motivo per cui costa poco
+e' che il disegno sta tutto in `KaraokeRenderer`, che riceve un Canvas e un rettangolo e non
+sa nient'altro: cambia solo il contenitore.
+
+Sul televisore l'aggiunta e' stata la categoria `LEANBACK_LAUNCHER`, il banner, le due
+`uses-feature` non obbligatorie (senza, i televisori risulterebbero incompatibili perche' non
+hanno touch) e il tasto Indietro che chiude il karaoke.
+
+Il web sarebbe un altro progetto: nessuna riga di questo codice e' riusabile fuori da Android,
+e servirebbero un OAuth PKCE nel browser e una riscrittura del renderer su canvas HTML. La
+trasmissione a Chromecast richiede un application id registrato presso Google e un receiver
+web da mantenere.
+
 ## Limiti noti
 
 - Nessun widget nella home di Android Auto: non esiste l'API

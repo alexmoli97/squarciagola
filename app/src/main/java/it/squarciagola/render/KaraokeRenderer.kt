@@ -177,13 +177,18 @@ class KaraokeRenderer {
         } else {
             // Prima che il brano attacchi, le prime righe stanno sotto il centro: si vede che
             // sta per cominciare invece di trovarsi la prima riga già a metà schermo.
-            -area.height() * 0.22f
+            -area.height() * 0.12f
         }
 
         avanzaTelecamera(destinazione)
 
         val originY = area.exactCenterY() - scroll
         val centerX = area.exactCenterX()
+
+        // Ritaglio alla fascia: senza, una riga a cavallo del bordo verrebbe disegnata a meta'
+        // sopra la barra di avanzamento o sotto il titolo.
+        canvas.save()
+        canvas.clipRect(area)
         for (indice in layout.blocks.indices) {
             val top = originY + layout.tops[indice]
             if (top + layout.heights[indice] < area.top) continue
@@ -194,6 +199,7 @@ class KaraokeRenderer {
                 colorePer(indice - fuoco), centerX,
             )
         }
+        canvas.restore()
     }
 
     /**
@@ -225,13 +231,20 @@ class KaraokeRenderer {
         paint.color = color
         rows.forEachIndexed { index, row ->
             if (row.isEmpty()) return@forEachIndexed
+            // Si disegnano solo le righe che ci stanno per intero: una riga tagliata a meta'
+            // dal bordo della fascia sembra un errore di disegno, non una scelta.
+            val rigaAlta = top + rowHeight * index
+            if (rigaAlta < area.top || rigaAlta + rowHeight > area.bottom) return@forEachIndexed
             val baseline = top + rowHeight * (index + 0.8f)
-            if (baseline < area.top || baseline > area.bottom + rowHeight) return@forEachIndexed
             canvas.drawText(row, centerX, baseline, paint)
         }
     }
 
-    /** Le righe sfumano allontanandosi da quella attiva, cosi' l'occhio trova subito il centro. */
+    /**
+     * Le righe sfumano allontanandosi da quella attiva, così l'occhio trova subito il centro.
+     * I grigi restano comunque chiari: sotto c'è la copertina, e una gerarchia costruita con
+     * toni troppo scuri diventa testo illeggibile appena l'album è chiaro.
+     */
     private fun colorePer(distanza: Int): Int = when (distanza) {
         0 -> COLOR_ACTIVE
         -1, 1 -> COLOR_NEAR
@@ -401,10 +414,10 @@ class KaraokeRenderer {
         const val REFERENCE_CONTENT = 235f
 
         /** Quanto resta del gradiente sopra la copertina velata. */
-        const val ARTWORK_SCRIM_ALPHA = 150
+        const val ARTWORK_SCRIM_ALPHA = 120
 
         /** Velo nero sotto il gradiente: e' lui a garantire il contrasto minimo del testo. */
-        const val COLOR_SCRIM = 0xBE000000.toInt()
+        const val COLOR_SCRIM = 0x8C000000.toInt()
 
         const val COLOR_BACKGROUND = 0xFF0B0B0F.toInt()
         const val COLOR_BACKGROUND_TOP = 0xFF111A15.toInt()
@@ -412,8 +425,8 @@ class KaraokeRenderer {
         const val COLOR_TITLE = Color.WHITE
         const val COLOR_ACTIVE = 0xFF7BE3A3.toInt()
         const val COLOR_NEAR = 0xFFD8D8DE.toInt()
-        const val COLOR_FAR = 0xFF7E7E8A.toInt()
-        const val COLOR_FAINT = 0xFF55555F.toInt()
+        const val COLOR_FAR = 0xFFACACB6.toInt()
+        const val COLOR_FAINT = 0xFF8C8C97.toInt()
         const val COLOR_DIM = 0xFF9A9AA5.toInt()
         const val COLOR_BAR_BACKGROUND = 0xFF2A2A33.toInt()
     }

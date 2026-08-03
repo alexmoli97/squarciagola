@@ -5,20 +5,28 @@ import android.graphics.BitmapFactory
 import it.squarciagola.net.Http
 
 /**
- * Copertina dell'album ridotta a una macchia di colore, da usare come sfondo del testo.
+ * Copertina dell'album sfocata, da usare come sfondo del testo.
  *
- * ponytail: la sfocatura non si calcola. Si scarica l'immagine più piccola che Spotify
- * espone e la si riduce a una manciata di pixel: ridisegnandola a schermo intero,
- * l'interpolazione del filtro bilineare fa da sola tutto il lavoro. Nessuna RenderScript,
- * nessun RenderEffect, nessun limite di versione, e il costo è quello di un bitmap da
- * qualche centinaio di byte.
+ * La sfocatura è calcolata davvero, con tre passate di media mobile su un'immagine ridotta.
+ * L'alternativa piu' furba, ridurre a pochi pixel e lasciare che l'ingrandimento faccia da
+ * sfumatura, produce un mosaico: si riconoscono i quadrati, non la foto. Qui la copertina
+ * resta riconoscibile e morbida.
  *
- * Il limite di questa scelta: la sfocatura non è regolabile con continuità, si controlla
- * solo cambiando [DIMENSIONE]. Per uno sfondo dietro al testo va più che bene.
+ * ponytail: media mobile scritta a mano invece di RenderEffect o RenderScript. RenderEffect
+ * vuole API 31 e un canvas accelerato, e in Android Auto si disegna su una Surface con
+ * lockCanvas, che accelerata non è: sarebbero due strade diverse per lo stesso risultato.
+ * Tre passate di box blur approssimano una gaussiana abbastanza bene, e il costo si paga una
+ * volta per brano su un thread di I/O, non nel ciclo di disegno.
  */
 object AlbumArt {
 
-    private const val DIMENSIONE = 24
+    /** Lato dell'immagine su cui si sfoca. Piu' alto, piu' dettaglio e piu' lavoro. */
+    private const val LATO = 160
+
+    /** Raggio della media mobile, in pixel dell'immagine ridotta. */
+    private const val RAGGIO = 6
+
+    private const val PASSATE = 3
 
     private var urlInCache: String? = null
     private var bitmapInCache: Bitmap? = null
@@ -31,19 +39,85 @@ object AlbumArt {
         val bytes = Http.getBytes(url) ?: return null
         val originale = runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
             .getOrNull() ?: return null
-        val ridotta = runCatching {
-            Bitmap.createScaledBitmap(originale, DIMENSIONE, DIMENSIONE, true)
-        }.getOrNull()
+
+        val ridotta = runCatching { Bitmap.createScaledBitmap(originale, LATO, LATO, true) }
+            .getOrNull()
         if (ridotta !== originale) originale.recycle()
+        if (ridotta == null) return null
+
+        val sfocata = runCatching { blur(ridotta) }.getOrNull() ?: ridotta
 
         urlInCache = url
-        bitmapInCache = ridotta
-        return ridotta
+        bitmapInCache = sfocata
+        return sfocata
     }
 
     @Synchronized
     fun clear() {
         urlInCache = null
         bitmapInCache = null
+    }
+
+    /**
+     * Tre passate di media mobile, ognuna orizzontale e poi verticale.
+     *
+     * Separare le due direzioni rende il costo proporzionale al raggio invece che al suo
+     * quadrato: su 160 per 160 pixel sono poche decine di migliaia di operazioni per passata.
+     */
+    private fun blur(source: Bitmap): Bitmap {
+        val w = source.width
+        val h = source.height
+        val pixels = IntArray(w * h)
+        source.getPixels(pixels, 0, w, 0, 0, w, h)
+        val appoggio = IntArray(w * h)
+
+        repeat(PASSATE) {
+            mediaOrizzontale(pixels, appoggio, w, h)
+            mediaVerticale(appoggio, pixels, w, h)
+        }
+
+        val risultato = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        risultato.setPixels(pixels, 0, w, 0, 0, w, h)
+        if (risultato !== source) source.recycle()
+        return risultato
+    }
+
+    private fun mediaOrizzontale(src: IntArray, dst: IntArray, w: Int, h: Int) {
+        for (y in 0 until h) {
+            val riga = y * w
+            for (x in 0 until w) {
+                var r = 0; var g = 0; var b = 0; var n = 0
+                var i = x - RAGGIO
+                val fine = x + RAGGIO
+                while (i <= fine) {
+                    val c = src[riga + i.coerceIn(0, w - 1)]
+                    r += (c shr 16) and 0xFF
+                    g += (c shr 8) and 0xFF
+                    b += c and 0xFF
+                    n++
+                    i++
+                }
+                dst[riga + x] = (0xFF shl 24) or ((r / n) shl 16) or ((g / n) shl 8) or (b / n)
+            }
+        }
+    }
+
+    private fun mediaVerticale(src: IntArray, dst: IntArray, w: Int, h: Int) {
+        for (x in 0 until w) {
+            for (y in 0 until h) {
+                var r = 0; var g = 0; var b = 0; var n = 0
+                var i = y - RAGGIO
+                val fine = y + RAGGIO
+                while (i <= fine) {
+                    val c = src[i.coerceIn(0, h - 1) * w + x]
+                    r += (c shr 16) and 0xFF
+                    g += (c shr 8) and 0xFF
+                    b += c and 0xFF
+                    n++
+                    i++
+                }
+                dst[y * w + x] = (0xFF shl 24) or ((r / n) shl 16) or ((g / n) shl 8) or (b / n)
+            }
+        }
     }
 }

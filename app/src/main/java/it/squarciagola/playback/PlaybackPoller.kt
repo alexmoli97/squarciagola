@@ -92,7 +92,7 @@ class PlaybackPoller(private val auth: SpotifyAuth) {
                 artist = artist,
                 album = item.optJSONObject("album")?.optString("name").orEmpty(),
                 durationMs = item.optLong("duration_ms"),
-                artworkUrl = smallestArtwork(item.optJSONObject("album")),
+                artworkUrl = mediumArtwork(item.optJSONObject("album")),
             ),
             progressMs = json.optLong("progress_ms"),
             isPlaying = json.optBoolean("is_playing"),
@@ -104,13 +104,15 @@ class PlaybackPoller(private val auth: SpotifyAuth) {
     }
 
     /**
-     * Spotify elenca le copertine dalla piu' grande alla piu' piccola. Si prende l'ultima:
-     * finisce sfocata a una manciata di pixel, scaricarne una da 640 sarebbe solo traffico.
+     * Spotify elenca le copertine dalla piu' grande alla piu' piccola. Si prende quella di
+     * mezzo, intorno ai 300 pixel: la piu' piccola e' da 64 e sfocata diventa una macchia
+     * squadrata, la piu' grande e' traffico sprecato per un'immagine che finisce sfocata.
      */
-    private fun smallestArtwork(album: JSONObject?): String {
+    private fun mediumArtwork(album: JSONObject?): String {
         val images = album?.optJSONArray("images") ?: return ""
         if (images.length() == 0) return ""
-        return images.optJSONObject(images.length() - 1)?.optString("url").orEmpty()
+        val indice = if (images.length() >= 3) 1 else 0
+        return images.optJSONObject(indice)?.optString("url").orEmpty()
     }
 
     private companion object {

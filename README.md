@@ -39,6 +39,21 @@ Servono JDK 17 o superiore e l'SDK Android (piattaforma 35).
 
 Se l'SDK non è nella posizione predefinita, indicalo in `local.properties` con `sdk.dir=...`.
 
+## Dove gira
+
+| Piattaforma | Stato |
+|---|---|
+| Telefono Android | supportata, e' la superficie principale |
+| Android Auto | supportata via sideload, categoria navigazione |
+| Android TV e Fire TV | supportata: launcher leanback, banner, tasto Indietro chiude il karaoke |
+| Web | non supportata, richiederebbe una riscrittura separata |
+| Trasmissione a Chromecast | non supportata, richiede un application id registrato e un receiver |
+
+Su televisore l'app si installa via sideload come sulle altre superfici. Il karaoke a schermo
+pieno e' esattamente cio' che serve li', e l'interfaccia era gia' scura e centrata: l'unica
+aggiunta e' stata la voce nel launcher e il tasto Indietro, perche' sul telecomando non c'e'
+un dito che raggiunge il pulsante di chiusura.
+
 ## Installazione
 
 ```bash
@@ -176,6 +191,7 @@ non si pone.
 | `ui/Theme.kt` | Schema colori Material 3, solo scuro |
 | `render/KaraokeRenderer.kt` | Tutto il disegno. Non conosce né l'auto né Compose |
 | `render/TextWrapper.kt` | Righe lunghe mandate a capo. Testato senza framework grafico |
+| `render/AlbumArt.kt` | Copertina sfocata con media mobile, sfondo del testo |
 | `update/UpdateChecker.kt` | Legge l'ultima release da GitHub. Testato |
 | `update/Updater.kt` | Download e avvio dell'installer di sistema |
 | `render/KaraokeView.kt` | Contenitore per il telefono |

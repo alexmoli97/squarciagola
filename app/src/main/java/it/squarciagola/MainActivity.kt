@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedContent
@@ -134,6 +135,9 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun Karaoke(onChiudi: () -> Unit) {
+        // Su televisore e in auto non c'e' un dito che raggiunge il pulsante: il tasto
+        // Indietro deve chiudere il karaoke invece di uscire dall'app.
+        BackHandler(onBack = onChiudi)
         Box(Modifier.fillMaxSize()) {
             AndroidView(
                 factory = { KaraokeView(it) },
