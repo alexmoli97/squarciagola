@@ -154,14 +154,22 @@ class MainActivity : ComponentActivity() {
 
             aggiornamento?.let { SchedaAggiornamento(it) { messaggio -> statoRicerca = messaggio } }
 
-            OutlinedTextField(
-                value = clientId,
-                onValueChange = { clientId = it; Engine.auth.clientId = it },
-                label = { Text("Client ID Spotify") },
-                supportingText = { Text("Da developer.spotify.com, con redirect URI it.squarciagola://auth") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            if (!Engine.auth.clientIdFromBuild) {
+                OutlinedTextField(
+                    value = clientId,
+                    onValueChange = { clientId = it; Engine.auth.clientId = it },
+                    label = { Text("Client ID Spotify") },
+                    supportingText = {
+                        Text(
+                            "Da developer.spotify.com, con redirect URI it.squarciagola://auth. " +
+                                "Mettendolo in local.properties come spotify.clientId, questo " +
+                                "campo sparisce."
+                        )
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(onClick = {

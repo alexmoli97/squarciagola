@@ -46,11 +46,22 @@ Head Unit dell'SDK.
 
 ### Spotify Web API (obbligatoria)
 
-Serve per sapere cosa sta suonando.
+Serve per sapere cosa sta suonando. La registrazione dell'app non e' aggirabile: senza un
+Client ID non esiste OAuth.
 
 1. Su [developer.spotify.com](https://developer.spotify.com/dashboard) crea un'app.
 2. Aggiungi come Redirect URI esattamente `it.squarciagola://auth`.
-3. Copia il Client ID nel campo corrispondente dell'app e premi **Accedi a Spotify**.
+3. Copia il Client ID in `local.properties`:
+
+```properties
+spotify.clientId=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+Ricompila e il campo sparisce dalla schermata: resta solo **Accedi a Spotify**. Il Client ID
+in PKCE non e' un segreto, quindi sta tranquillamente nel build; `local.properties` e' comunque
+fuori dal repository.
+
+Chi installa l'APK senza ricompilare trova il campo e puo' incollarlo a mano.
 
 Gli scope richiesti sono `user-read-playback-state` e `user-read-currently-playing`.
 Non serve il client secret: l'autenticazione usa PKCE.
@@ -74,15 +85,23 @@ Quando si rompe non resti a bocca asciutta: la sorgente restituisce "non disponi
 testo continua ad arrivare da LRCLIB. Te ne accorgi dal fatto che i testi tornano a essere
 quelli di LRCLIB, non da un errore a schermo.
 
-Per configurarla servono due valori presi dal web player:
+Per configurarla servono due valori presi dal web player. Vale la pena sapere cosa sono, perche'
+non sono impostazioni ma credenziali e contromisure:
 
-- **`sp_dc`**: nei cookie di `open.spotify.com` a sessione aperta, negli strumenti per
-  sviluppatori del browser
-- **segreto TOTP**: in esadecimale, insieme al numero di versione corrispondente. Il segreto e'
-  incorporato nel bundle JavaScript del web player; i progetti open source che seguono l'endpoint
-  pubblicano la coppia segreto/versione a ogni rotazione. La versione attesa dal codice e' nella
-  costante `TOTP_VERSION` in `SpotifyLyricsSource.kt` e va tenuta allineata al segreto incollato
-  nelle impostazioni: se divergono, il token viene rifiutato.
+- **`sp_dc`** e' il cookie di sessione del tuo account sul web player, nei cookie di
+  `open.spotify.com` con la sessione aperta. Equivale a essere loggato come te: chi ce l'ha puo'
+  agire come il tuo account finche' non scade. Per questo l'app lo tiene in
+  EncryptedSharedPreferences e non fra le preferenze normali.
+- **segreto TOTP**, in esadecimale. Da marzo 2025 la richiesta del token del web player deve
+  portare un codice a sei cifre calcolato dall'ora corrente piu' un segreto incorporato nel
+  bundle JavaScript del player: e' una misura anti-automazione, serve a dimostrare che chi
+  chiama sta eseguendo il codice vero del web player. I progetti open source che seguono
+  l'endpoint pubblicano la coppia segreto/versione a ogni rotazione. La versione attesa dal
+  codice sta nella costante `TOTP_VERSION` in `SpotifyLyricsSource.kt` e va tenuta allineata al
+  segreto incollato nelle impostazioni: se divergono, il token viene rifiutato.
+
+Entrambi esistono solo per fingersi il web player ufficiale, ed e' esattamente il motivo per
+cui questa strada viola i ToS ed e' fragile per costruzione.
 
 ### Sincronia
 

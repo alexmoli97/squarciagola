@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Base64
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import it.squarciagola.BuildConfig
 import it.squarciagola.net.Http
 import org.json.JSONObject
 import java.security.MessageDigest
@@ -28,9 +29,17 @@ class SpotifyAuth(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
     )
 
+    /**
+     * Preso dal build (local.properties) se c'e', altrimenti da quello scritto a mano
+     * nell'app. Il valore nel build vince: e' quello che fa sparire il campo dalla schermata.
+     */
     var clientId: String
-        get() = prefs.getString(KEY_CLIENT_ID, "").orEmpty()
+        get() = BuildConfig.SPOTIFY_CLIENT_ID.takeIf { it.isNotEmpty() }
+            ?: prefs.getString(KEY_CLIENT_ID, "").orEmpty()
         set(value) = prefs.edit().putString(KEY_CLIENT_ID, value.trim()).apply()
+
+    /** True quando il Client ID arriva dal build e non c'e' nulla da chiedere all'utente. */
+    val clientIdFromBuild: Boolean get() = BuildConfig.SPOTIFY_CLIENT_ID.isNotEmpty()
 
     /** Cookie di sessione del web player, serve solo alla sorgente testi di Spotify. */
     var spDc: String

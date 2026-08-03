@@ -1,8 +1,20 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+/**
+ * Client ID di Spotify preso da local.properties, che non finisce nel repository.
+ * In PKCE non e' un segreto, ma non c'e' motivo di digitarlo sul telefono a ogni
+ * installazione: lo si mette una volta qui e il campo sparisce dalla schermata.
+ */
+val spotifyClientId: String = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}.getProperty("spotify.clientId").orEmpty().trim()
 
 android {
     namespace = "it.squarciagola"
@@ -14,12 +26,14 @@ android {
         targetSdk = 35
         // Il versionCode e' il numero nel tag della release GitHub (v2, v3, ...): e' quello
         // che l'app confronta per capire se c'e' un aggiornamento. Vedi UpdateChecker.
-        versionCode = 3
-        versionName = "0.3"
+        versionCode = 4
+        versionName = "0.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Redirect URI dell'OAuth PKCE: it.squarciagola://auth
         manifestPlaceholders["authScheme"] = "it.squarciagola"
+
+        buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"$spotifyClientId\"")
     }
 
     buildTypes {
