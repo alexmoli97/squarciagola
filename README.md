@@ -86,10 +86,31 @@ Per configurarla servono due valori presi dal web player:
 
 ### Sincronia
 
-Il Bluetooth introduce un ritardo audio che cambia da impianto a impianto, e la posizione
-riportata da Spotify e' gia' vecchia quando arriva. L'offset si regola dal telefono a passi di
-50 ms e in auto con i due pulsanti sulla barra dei comandi, a passi di 100 ms. Positivo se il
-testo va in ritardo rispetto a quello che senti.
+Il disallineamento ha due cause, e solo una e' misurabile.
+
+**Latenza di rete: automatica.** La posizione riportata da Spotify descrive un istante gia'
+passato quando la risposta arriva. L'app misura il round-trip di ogni richiesta e colloca
+l'istante di campionamento mezzo round-trip indietro. Nessuna taratura, si adatta da solo al
+variare della connessione.
+
+**Ritardo audio dell'impianto: una taratura per dispositivo.** E' a valle di Spotify, in un
+percorso audio che l'app non controlla, e nessuna API lo espone: non esiste modo software di
+misurarlo. Quello che l'app fa e' non farlo tarare due volte, tenendo un valore separato per
+ogni uscita audio (impianto dell'auto, cuffie, altoparlante del telefono). Calibri una volta e
+al collegamento successivo il valore torna da solo.
+
+Si regola dal telefono a passi di 50 ms e in auto con i due pulsanti sulla barra dei comandi, a
+passi di 100 ms. Positivo se il testo va in ritardo rispetto a quello che senti. La scheda sul
+telefono mostra a quale uscita si riferisce il valore che stai modificando.
+
+### Quale sorgente sta lavorando
+
+In alto a destra nel karaoke c'e' scritto da dove arriva il testo mostrato. Serve ad accorgersi
+quando la sorgente Spotify smette di rispondere e sta lavorando LRCLIB di riserva: il ripiego e'
+silenzioso per non interrompere l'ascolto, e senza questa indicazione non sarebbe visibile.
+
+Cambiando l'interruttore della sorgente la cache dei testi viene svuotata, altrimenti i brani
+gia' visti resterebbero con il testo della sorgente precedente.
 
 ## Aggiornamenti senza store
 

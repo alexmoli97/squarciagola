@@ -51,7 +51,9 @@ class PlaybackPoller(private val auth: SpotifyAuth) {
             return@withContext
         }
 
+        val requestStart = SystemClock.elapsedRealtime()
         val body = Http.get(PLAYER_URL, mapOf("Authorization" to "Bearer $token"))
+        val roundTrip = SystemClock.elapsedRealtime() - requestStart
         if (body == null) {
             // Puo' essere assenza di rete oppure un errore temporaneo: si tiene l'ultimo stato
             // valido e si riprova al giro dopo, senza azzerare il testo gia' a schermo.
@@ -64,7 +66,7 @@ class PlaybackPoller(private val auth: SpotifyAuth) {
             return@withContext
         }
 
-        val parsed = parse(body)
+        val parsed = parse(body, roundTrip)
         if (parsed == null) {
             _problem.value = "Nessun brano in riproduzione"
             _state.value = PlaybackState.IDLE
@@ -74,7 +76,7 @@ class PlaybackPoller(private val auth: SpotifyAuth) {
         }
     }
 
-    private fun parse(body: String): PlaybackState? {
+    private fun parse(body: String, roundTripMs: Long): PlaybackState? {
         val json = JSONObject(body)
         val item = json.optJSONObject("item") ?: return null
         val id = item.optString("id").takeIf { it.isNotEmpty() } ?: return null
@@ -93,7 +95,10 @@ class PlaybackPoller(private val auth: SpotifyAuth) {
             ),
             progressMs = json.optLong("progress_ms"),
             isPlaying = json.optBoolean("is_playing"),
-            sampledAtElapsedRealtime = SystemClock.elapsedRealtime(),
+            // Il valore letto descrive un istante gia' passato: il server ha risposto a meta'
+            // del viaggio, quindi l'istante di campionamento vero e' mezzo round-trip fa.
+            // Questa parte della sincronia si corregge da sola, senza tarature.
+            sampledAtElapsedRealtime = SystemClock.elapsedRealtime() - roundTripMs / 2,
         )
     }
 

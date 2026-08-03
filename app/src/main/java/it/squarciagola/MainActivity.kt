@@ -193,9 +193,11 @@ class MainActivity : ComponentActivity() {
                         })
                     }
                     Text(
-                        "Endpoint interno, contro i Termini di Servizio di Spotify. Si rompe a ogni " +
-                            "rotazione del segreto del web player: quando succede, il testo torna " +
-                            "automaticamente da LRCLIB. Spento, si usa solo LRCLIB.",
+                        "Endpoint interno, contro i Termini di Servizio di Spotify. Servono " +
+                            "entrambi i campi qui sotto: senza, la sorgente si tira indietro e " +
+                            "il testo arriva da LRCLIB. Si rompe anche a ogni rotazione del " +
+                            "segreto del web player, sempre ripiegando su LRCLIB. La sorgente " +
+                            "effettivamente usata e' scritta in alto a destra nel karaoke.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                     if (usaSpotify) {
@@ -220,10 +222,12 @@ class MainActivity : ComponentActivity() {
 
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Sincronia: $offset ms")
+                    Text("Sincronia su ${Engine.outputName}: $offset ms")
                     Text(
-                        "Positivo se il testo va in ritardo rispetto all'audio. Il Bluetooth " +
-                            "introduce un ritardo che cambia da impianto a impianto.",
+                        "La latenza di rete e' gia' compensata da sola. Questo valore copre il " +
+                            "ritardo audio dell'impianto, che nessuna API espone: si tara una " +
+                            "volta e torna da solo a ogni collegamento a questa uscita. " +
+                            "Positivo se il testo va in ritardo rispetto a quello che senti.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

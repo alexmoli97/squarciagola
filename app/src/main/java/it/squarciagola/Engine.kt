@@ -10,6 +10,7 @@ import it.squarciagola.lyrics.SpotifyLyricsSource
 import it.squarciagola.model.KaraokeFrame
 import it.squarciagola.model.Lyrics
 import it.squarciagola.model.PlaybackState
+import it.squarciagola.playback.AudioOutput
 import it.squarciagola.playback.PlaybackPoller
 import it.squarciagola.playback.PositionClock
 import kotlinx.coroutines.CoroutineScope
@@ -52,12 +53,38 @@ object Engine {
     val playback: StateFlow<PlaybackState> get() = poller.state
     val problem: StateFlow<String?> get() = poller.problem
 
-    /** Compensazione manuale del ritardo audio, in millisecondi. */
+    /**
+     * Compensazione del ritardo audio, tenuta separata per dispositivo di uscita.
+     *
+     * La latenza di rete si corregge da sola in [PlaybackPoller]. Questa copre il ritardo
+     * dell'impianto, che nessuna API espone: si tara una volta per auto o per cuffie e poi
+     * torna da sola al collegamento successivo.
+     */
     var offsetMs: Long
-        get() = prefs().getLong(KEY_OFFSET, 0L)
+        get() = prefs().getLong(offsetKey(), 0L)
         set(value) {
-            prefs().edit().putLong(KEY_OFFSET, value.coerceIn(-5_000, 5_000)).apply()
+            prefs().edit().putLong(offsetKey(), value.coerceIn(-5_000, 5_000)).apply()
         }
+
+    /**
+     * Nome dell'uscita audio attiva.
+     *
+     * ponytail: valore tenuto in cache per un paio di secondi. Viene letto a ogni fotogramma
+     * tramite l'offset, e interrogare AudioManager trenta volte al secondo per un dato che
+     * cambia quando colleghi il Bluetooth sarebbe spreco puro.
+     */
+    val outputName: String
+        get() {
+            val now = SystemClock.elapsedRealtime()
+            if (now - outputCheckedAt > OUTPUT_CACHE_MS) {
+                cachedOutputName = AudioOutput.currentName(appContext)
+                outputCheckedAt = now
+            }
+            return cachedOutputName
+        }
+
+    private var cachedOutputName = AudioOutput.DEFAULT
+    private var outputCheckedAt = 0L
 
     /** Se false, la sorgente Spotify viene saltata e si usa solo LRCLIB. */
     var useSpotifyLyrics: Boolean
@@ -65,6 +92,9 @@ object Engine {
         set(value) {
             prefs().edit().putBoolean(KEY_USE_SPOTIFY, value).apply()
             rebuildRepository()
+            // Senza questo il testo gia' in cache resterebbe quello della sorgente precedente,
+            // e cambiare interruttore sembrerebbe non avere alcun effetto.
+            clearLyricsCache()
         }
 
     fun init(context: Context) {
@@ -97,13 +127,19 @@ object Engine {
     fun currentFrame(): KaraokeFrame {
         val state = playback.value
         val track = state.track
+        val lyrics = _lyrics.value
         return KaraokeFrame(
             title = track?.title.orEmpty(),
             artist = track?.artist.orEmpty(),
-            lyrics = _lyrics.value,
+            lyrics = lyrics,
             positionMs = PositionClock.positionMs(state, SystemClock.elapsedRealtime(), offsetMs),
             durationMs = track?.durationMs ?: 0L,
             isPlaying = state.isPlaying,
+            source = when (lyrics) {
+                is Lyrics.Synced -> lyrics.source
+                is Lyrics.Plain -> "${lyrics.source}, non sincronizzato"
+                else -> ""
+            },
             message = problem.value,
         )
     }
@@ -133,8 +169,11 @@ object Engine {
         repository = LyricsRepository(appContext.filesDir, sources)
     }
 
+    private fun offsetKey() = "$KEY_OFFSET_PREFIX$outputName"
+
     private fun prefs() = appContext.getSharedPreferences("squarciagola", Context.MODE_PRIVATE)
 
-    private const val KEY_OFFSET = "offset_ms"
+    private const val KEY_OFFSET_PREFIX = "offset_ms_"
     private const val KEY_USE_SPOTIFY = "use_spotify_lyrics"
+    private const val OUTPUT_CACHE_MS = 2_000L
 }

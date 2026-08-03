@@ -14,8 +14,8 @@ android {
         targetSdk = 35
         // Il versionCode e' il numero nel tag della release GitHub (v2, v3, ...): e' quello
         // che l'app confronta per capire se c'e' un aggiornamento. Vedi UpdateChecker.
-        versionCode = 2
-        versionName = "0.2"
+        versionCode = 3
+        versionName = "0.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Redirect URI dell'OAuth PKCE: it.squarciagola://auth

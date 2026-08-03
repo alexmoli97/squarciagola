@@ -75,6 +75,20 @@ class KaraokeRenderer {
             area.top + titlePaint.textSize * 1.6f + subtitlePaint.textSize * 1.5f,
             subtitlePaint,
         )
+
+        // Da dove arriva il testo: senza questo non c'e' modo di accorgersi che una sorgente
+        // ha smesso di rispondere e sta lavorando quella di riserva.
+        if (frame.source.isNotEmpty()) {
+            subtitlePaint.color = COLOR_FAR
+            subtitlePaint.textAlign = Paint.Align.RIGHT
+            canvas.drawText(
+                frame.source,
+                area.right - area.width() * 0.05f,
+                area.top + titlePaint.textSize * 1.6f,
+                subtitlePaint,
+            )
+            subtitlePaint.textAlign = Paint.Align.LEFT
+        }
     }
 
     private fun drawBody(canvas: Canvas, area: Rect, frame: KaraokeFrame) {

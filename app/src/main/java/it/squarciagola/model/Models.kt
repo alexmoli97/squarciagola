@@ -56,6 +56,8 @@ data class KaraokeFrame(
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
     val isPlaying: Boolean = false,
+    /** Da dove arriva il testo mostrato. Vuoto se non c'e' testo. */
+    val source: String = "",
     /** Messaggio che sostituisce il testo quando qualcosa non va (login scaduto, niente rete). */
     val message: String? = null,
 )
