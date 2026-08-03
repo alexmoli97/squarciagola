@@ -67,11 +67,12 @@ class KaraokeRenderer {
         titlePaint.textSize = 19f * scale
         subtitlePaint.textSize = 14f * scale
 
-        // Riga attiva e righe di contorno hanno la stessa dimensione di proposito. Cambiarla
-        // fra le due significherebbe rifare il layout a ogni cambio riga, e il riflusso si
-        // vedrebbe come uno scatto. L'evidenziazione la portano grassetto, colore e alone.
+        // La riga in corso e' piu' grande delle altre, ma il layout non cambia mai: ogni riga
+        // si prende comunque l'altezza della misura grande, e quelle di contorno vengono
+        // disegnate piu' piccole al centro del loro spazio. Cosi' la gerarchia si vede e lo
+        // scorrimento non subisce il riflusso che si vedrebbe come uno scatto a ogni cambio.
         activePaint.textSize = LYRIC_SIZE * scale
-        idlePaint.textSize = LYRIC_SIZE * scale
+        idlePaint.textSize = LYRIC_SIZE * scale * RAPPORTO_CONTORNO
 
         drawHeader(canvas, area, frame)
         drawBody(canvas, contentArea(area), frame)
@@ -278,7 +279,12 @@ class KaraokeRenderer {
                     )
                 }
                 activePaint.color = if (locale >= 1f) accento else COLOR_DA_CANTARE
-                canvas.drawText(row, centerX, top + rowHeight * (index + 0.8f), activePaint)
+                canvas.drawText(
+                    row,
+                    centerX,
+                    rigaAlta + rowHeight / 2f + activePaint.textSize * 0.36f,
+                    activePaint,
+                )
                 activePaint.shader = null
             }
             fatti += row.length
@@ -321,7 +327,7 @@ class KaraokeRenderer {
             // dal bordo della fascia sembra un errore di disegno, non una scelta.
             val rigaAlta = top + rowHeight * index
             if (rigaAlta < area.top || rigaAlta + rowHeight > area.bottom) return@forEachIndexed
-            val baseline = top + rowHeight * (index + 0.8f)
+            val baseline = rigaAlta + rowHeight / 2f + paint.textSize * 0.36f
             canvas.drawText(row, centerX, baseline, paint)
         }
     }
@@ -357,7 +363,9 @@ class KaraokeRenderer {
 
     private fun layoutFor(identita: Any, testi: List<String>, area: Rect): Layout {
         val maxWidth = area.width() * 0.92f
-        val rowHeight = idlePaint.textSize * ROW_SPACING
+        // Altezza dettata dalla misura grande, non da quella corrente: e' cio' che rende il
+        // layout indipendente da quale riga sia attiva.
+        val rowHeight = activePaint.textSize * ROW_SPACING
         val esistente = layout
         if (esistente != null &&
             esistente.identita === identita &&
@@ -486,8 +494,11 @@ class KaraokeRenderer {
     }
 
     private companion object {
-        const val ROW_SPACING = 1.28f
-        const val LYRIC_SIZE = 25f
+        const val ROW_SPACING = 1.24f
+        const val LYRIC_SIZE = 28f
+
+        /** Quanto sono piu' piccole le righe di contorno rispetto a quella in corso. */
+        const val RAPPORTO_CONTORNO = 0.68f
 
         /** Quanta larghezza puo' occupare l'intestazione prima dell'angolo riservato. */
         const val HEADER_WIDTH_RATIO = 0.68f

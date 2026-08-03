@@ -153,6 +153,11 @@ quanto è diffuso, altrimenti vincerebbe sempre il grigio del fondo copertina, e
 riportato dentro una finestra di saturazione e luminosità che garantisce almeno 4,5:1 di
 contrasto sul fondo scuro. Una copertina senza colore ricade sul verde menta.
 
+**La riga in corso e' piu' grande delle altre.** Il layout pero' non cambia mai: ogni riga si
+prende comunque l'altezza della misura grande, e quelle di contorno vengono disegnate piu'
+piccole al centro del loro spazio. Fare altrimenti significherebbe ricalcolare le posizioni a
+ogni cambio riga, e quel riflusso si vedrebbe come uno scatto nello scorrimento.
+
 **La riga in corso si riempie mentre viene cantata**, da sinistra a destra: la parte già
 passata prende il colore del brano, quella ancora da dire resta chiara. LRCLIB dà l'attacco
 di ogni riga e non di ogni parola, quindi l'avanzamento si ricava dallo spazio fra un attacco
