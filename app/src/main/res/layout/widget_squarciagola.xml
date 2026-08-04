@@ -1,66 +1,99 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Layout deliberatamente povero: solo viste che le RemoteViews accettano da sempre e nessun
-  riferimento che debba risolversi nel tema del launcher. La barra di avanzamento e' stata
-  tolta: era il pezzo piu' a rischio e diceva la cosa meno importante.
+  Intestazione compatta in cima, tutto il resto al testo. Solo viste che le RemoteViews
+  accettano da sempre e nessun riferimento da risolvere nel tema del launcher: il widget deve
+  gonfiarsi anche quando il nostro codice non gira.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/radice"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
+    android:orientation="vertical"
     android:background="@drawable/widget_sfondo"
-    android:padding="14dp"
-    android:gravity="center_vertical">
-
-    <ImageView
-        android:id="@+id/copertina"
-        android:layout_width="64dp"
-        android:layout_height="64dp"
-        android:scaleType="centerCrop"
-        android:src="@drawable/ic_launcher"
-        android:contentDescription="@string/app_name" />
+    android:padding="14dp">
 
     <LinearLayout
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:id="@+id/copertina"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_launcher"
+            android:contentDescription="@string/app_name" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/titolo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="@string/app_name"
+                android:textColor="#FFE6E6EC"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/artista"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="@string/widget_descrizione"
+                android:textColor="#FFB0B0BC"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Il karaoke: riga precedente, quella in corso, quella dopo. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginStart="14dp"
-        android:orientation="vertical">
+        android:layout_marginTop="12dp"
+        android:orientation="vertical"
+        android:gravity="center_vertical">
 
         <TextView
-            android:id="@+id/titolo"
+            android:id="@+id/riga_precedente"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:maxLines="1"
             android:ellipsize="end"
-            android:text="@string/app_name"
-            android:textColor="#FFE6E6EC"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textColor="#FF83838F"
+            android:textSize="13sp" />
 
         <TextView
-            android:id="@+id/artista"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:text="@string/widget_descrizione"
-            android:textColor="#FFB0B0BC"
-            android:textSize="13sp"
-            android:layout_marginTop="2dp" />
-
-        <!-- La riga che si sta cantando: e' il motivo per cui il widget esiste. -->
-        <TextView
-            android:id="@+id/riga"
+            android:id="@+id/riga_corrente"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:maxLines="2"
             android:ellipsize="end"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="4dp"
             android:text="@string/widget_canta"
             android:textColor="#FF7BE3A3"
-            android:textSize="15sp"
+            android:textSize="17sp"
             android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/riga_successiva"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="#FF83838F"
+            android:textSize="13sp" />
     </LinearLayout>
 </LinearLayout>

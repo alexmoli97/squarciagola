@@ -168,7 +168,7 @@ object Engine {
     private suspend fun seguiRigaPerIlWidget() {
         var ultima: String? = null
         while (currentCoroutineContext().isActive) {
-            val riga = rigaCorrente()
+            val riga = righeWidget().corrente
             if (riga != ultima) {
                 ultima = riga
                 WidgetSquarciagola.aggiorna(appContext)
@@ -183,21 +183,51 @@ object Engine {
         _origine.value = ""
     }
 
+    /** Le tre righe che il widget mostra: quella prima, quella in corso, quella dopo. */
+    data class RigheWidget(
+        val precedente: String = "",
+        val corrente: String = "",
+        val successiva: String = "",
+    )
+
     /**
-     * Testo della riga che si sta cantando adesso, vuoto se il brano non ha testo
-     * sincronizzato. Serve al widget, che non puo' disegnare ma sa mostrare una riga.
+     * Il karaoke ridotto a tre righe di testo, per il widget, che non puo' disegnare.
      *
-     * Come nel karaoke, le pause strumentali (righe vuote nel file LRC) non diventano uno
-     * schermo vuoto: si resta sull'ultima riga cantata.
+     * Come nel karaoke a schermo intero, le pause strumentali (righe vuote nel file LRC) non
+     * svuotano lo schermo: si resta sull'ultima riga cantata, e anche il contesto sopra e
+     * sotto salta le righe vuote invece di mostrare buchi.
      */
-    fun rigaCorrente(): String {
-        val testo = _lyrics.value as? Lyrics.Synced ?: return ""
+    fun righeWidget(): RigheWidget {
+        val testo = _lyrics.value as? Lyrics.Synced ?: return RigheWidget()
+        val righe = testo.lines
         val posizione = PositionClock.positionMs(
             playback.value, SystemClock.elapsedRealtime(), offsetMs,
         )
-        var indice = LrcParser.activeIndex(testo.lines, posizione)
-        while (indice >= 0 && testo.lines[indice].text.isBlank()) indice--
-        return if (indice in testo.lines.indices) testo.lines[indice].text else ""
+
+        var indice = LrcParser.activeIndex(righe, posizione)
+        while (indice >= 0 && righe[indice].text.isBlank()) indice--
+        if (indice !in righe.indices) {
+            return RigheWidget(successiva = testoNonVuoto(righe, 0, avanti = true))
+        }
+        return RigheWidget(
+            precedente = testoNonVuoto(righe, indice - 1, avanti = false),
+            corrente = righe[indice].text,
+            successiva = testoNonVuoto(righe, indice + 1, avanti = true),
+        )
+    }
+
+    /** Prima riga non vuota a partire da [da], nella direzione indicata. */
+    private fun testoNonVuoto(
+        righe: List<it.squarciagola.model.LyricLine>,
+        da: Int,
+        avanti: Boolean,
+    ): String {
+        var i = da
+        while (i in righe.indices) {
+            if (righe[i].text.isNotBlank()) return righe[i].text
+            i += if (avanti) 1 else -1
+        }
+        return ""
     }
 
     /** Fotogramma corrente, pronto per il renderer. */

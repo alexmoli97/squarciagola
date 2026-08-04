@@ -191,9 +191,12 @@ In basso a destra nel karaoke c'è scritto da dove arriva il testo, e se è sinc
 
 ## Widget
 
-Sul telefono c'e' un widget per la schermata iniziale: copertina, brano, artista e **la riga
-che si sta cantando adesso**, con il colore del brano come nel resto dell'app. Toccandolo si va
-dritti al karaoke invece che al menu, perche' il widget lo si tocca per cantare.
+Sul telefono c'e' un widget per la schermata iniziale, strutturato come il karaoke: in cima
+una fascia compatta con copertina, titolo e artista, e **tutto lo spazio restante al testo**,
+con la riga precedente, quella in corso nel colore del brano, e quella successiva. Toccandolo
+si va dritti al karaoke invece che al menu, perche' il widget lo si tocca per cantare.
+
+E' ridimensionabile: allargandolo in altezza le tre righe respirano di piu'.
 
 La riga si aggiorna al cambio riga e non a tempo. Il controllo avviene in memoria ogni frazione
 di secondo, ed e' una ricerca binaria su un centinaio di numeri, ma l'invio al widget parte solo
