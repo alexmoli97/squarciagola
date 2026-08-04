@@ -224,16 +224,27 @@ class KaraokeRenderer {
     /**
      * Quanto della riga corrente e' gia' stato cantato, fra 0 e 1.
      *
-     * LRCLIB da' l'istante di attacco di ogni riga, non di ogni parola. La frazione si ricava
-     * dallo spazio fra un attacco e il successivo: non e' precisa quanto una sincronia per
-     * parola, ma dice dove sei dentro la riga invece che soltanto su quale riga sei.
+     * LRCLIB da' l'istante di attacco di ogni riga, mai la sua durata ne' i tempi delle
+     * singole parole. Spalmare il riempimento su tutto l'intervallo fino alla riga successiva
+     * sembra la cosa ovvia ed e' sbagliata: fra due righe ci sta spesso uno stacco
+     * strumentale, e il riempimento striscerebbe lento mentre chi canta ha gia' finito.
+     *
+     * Si stima invece la durata dal numero di caratteri, a una velocita' di canto plausibile,
+     * e la si limita allo spazio realmente disponibile. Resta una stima: quando la riga viene
+     * strascicata o sputata in fretta lo scarto si vede. La cura vera sarebbe una sincronia
+     * per parola, che la sorgente non fornisce.
      */
     private fun frazioneCantata(lines: List<LyricLine>?, fuoco: Int, frame: KaraokeFrame): Float {
         if (lines == null || fuoco !in lines.indices) return 1f
         val inizio = lines[fuoco].timeMs
-        val fine = if (fuoco + 1 < lines.size) lines[fuoco + 1].timeMs else frame.durationMs
-        if (fine <= inizio) return 1f
-        return ((frame.positionMs - inizio).toFloat() / (fine - inizio)).coerceIn(0f, 1f)
+        val prossima = if (fuoco + 1 < lines.size) lines[fuoco + 1].timeMs else frame.durationMs
+        val spazio = prossima - inizio
+        if (spazio <= 0) return 1f
+
+        val caratteri = lines[fuoco].text.length.coerceAtLeast(1)
+        val stimata = (caratteri * 1000L / CARATTERI_AL_SECONDO).coerceAtLeast(DURATA_MINIMA_MS)
+        val durata = minOf(spazio, stimata)
+        return ((frame.positionMs - inizio).toFloat() / durata).coerceIn(0f, 1f)
     }
 
     /**
@@ -502,6 +513,13 @@ class KaraokeRenderer {
 
         /** Quanta larghezza puo' occupare l'intestazione prima dell'angolo riservato. */
         const val HEADER_WIDTH_RATIO = 0.68f
+
+        /**
+         * Velocita' di canto usata per stimare quanto dura una riga. Piu' alta, piu' in fretta
+         * si riempie. E' la manopola da toccare se il riempimento anticipa o ritarda.
+         */
+        const val CARATTERI_AL_SECONDO = 13L
+        const val DURATA_MINIMA_MS = 600L
 
         /** Costante di tempo della telecamera: piu' alta, piu' morbido e piu' lento. */
         const val TAU = 0.11f

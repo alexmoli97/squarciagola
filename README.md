@@ -146,10 +146,14 @@ Tema scuro unico, per la schermata e per il karaoke. Non è una preferenza estet
 si guarda al buio, in macchina di sera o col telefono nel supporto, e uno schermo chiaro in
 quelle condizioni acceca.
 
-La schermata iniziale e' un palco, non un pannello di controllo: in cima cosa sta suonando,
-grande, con l'azione per cantarlo; le impostazioni scendono sotto a un peso visivo minore.
-La copertina sfocata fa da sfondo anche qui, non solo nel karaoke, e il pulsante respira
-mentre la musica va.
+Due pagine distinte. La **home** fa una cosa sola: dice cosa sta suonando, in grande, e ti fa
+cantare; sotto una riga sottile con il punto del brano, per saperlo senza aprire il karaoke.
+Le **impostazioni** stanno dietro una porta, perche' la configurazione si tocca una volta e il
+canto ogni giorno. Il passaggio fra le due scorre lungo un asse orizzontale, a destra entrando
+e a sinistra tornando, cosi' il movimento dice dove sei finito.
+
+La copertina sfocata fa da sfondo a tutte e tre le schermate, e il pulsante respira mentre la
+musica va.
 
 **L'accento lo detta la musica.** Resta la regola di sempre, un solo colore che marca la riga
 in corso e l'azione principale, ma quel colore viene ricavato dalla copertina del brano: ogni
@@ -165,10 +169,15 @@ ogni cambio riga, e quel riflusso si vedrebbe come uno scatto nello scorrimento.
 
 **La riga in corso si riempie mentre viene cantata**, da sinistra a destra: la parte già
 passata prende il colore del brano, quella ancora da dire resta chiara. LRCLIB dà l'attacco
-di ogni riga e non di ogni parola, quindi l'avanzamento si ricava dallo spazio fra un attacco
-e il successivo, spartito fra le righe a schermo in proporzione ai caratteri. Non è preciso
-come una sincronia per parola, ma dice dove sei dentro la riga invece che soltanto su quale
-riga sei.
+di ogni riga, mai la sua durata né i tempi delle singole parole. Spalmare il riempimento su
+tutto l'intervallo fino alla riga dopo sembra la cosa ovvia ed è sbagliata: fra due righe ci
+sta spesso uno stacco strumentale, e il riempimento striscerebbe lento mentre chi canta ha già
+finito. La durata si stima quindi dal numero di caratteri, a una velocità di canto plausibile,
+limitata allo spazio realmente disponibile.
+
+Resta una stima: su una riga strascicata o sputata in fretta lo scarto si vede. La manopola è
+`CARATTERI_AL_SECONDO` in `KaraokeRenderer`, alzala se il riempimento ritarda. La cura vera
+sarebbe una sincronia per parola, che la sorgente non fornisce.
 
 Le tre barrette accanto al titolo si muovono mentre la musica va e si posano in pausa, così da
 lontano si vede se il polling sta ricevendo; seguono l'impostazione di sistema per la rimozione

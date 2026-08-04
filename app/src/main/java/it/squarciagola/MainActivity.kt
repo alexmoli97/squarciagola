@@ -41,7 +41,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -76,6 +79,7 @@ import it.squarciagola.update.Release
 import it.squarciagola.update.UpdateChecker
 import it.squarciagola.update.Updater
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -147,13 +151,134 @@ class MainActivity : ComponentActivity() {
 
     // --- struttura ------------------------------------------------------------------------
 
+    private enum class Pagina { HOME, IMPOSTAZIONI, KARAOKE }
+
     @Composable
     private fun Root() {
-        var karaokeAperto by remember { mutableStateOf(false) }
+        var pagina by remember { mutableStateOf(Pagina.HOME) }
+        val animazioni = animazioniAttive()
+
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            if (karaokeAperto) Karaoke(onChiudi = { karaokeAperto = false })
-            else Setup(onCanta = { karaokeAperto = true })
+            AnimatedContent(
+                targetState = pagina,
+                label = "pagina",
+                transitionSpec = {
+                    if (!animazioni) {
+                        fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+                    } else {
+                        // Asse condiviso: si va a destra entrando nelle impostazioni e a
+                        // sinistra tornando, cosi' il movimento dice dove sei finito.
+                        val avanti = targetState.ordinal > initialState.ordinal
+                        val verso = if (avanti) 1 else -1
+                        (slideInHorizontally(tween(280)) { larghezza -> verso * larghezza / 6 } +
+                            fadeIn(tween(220))) togetherWith
+                            (slideOutHorizontally(tween(280)) { larghezza -> -verso * larghezza / 6 } +
+                                fadeOut(tween(180)))
+                    }
+                },
+            ) { corrente ->
+                when (corrente) {
+                    Pagina.HOME -> Home(
+                        onCanta = { pagina = Pagina.KARAOKE },
+                        onImpostazioni = { pagina = Pagina.IMPOSTAZIONI },
+                    )
+
+                    Pagina.IMPOSTAZIONI -> Impostazioni(onIndietro = { pagina = Pagina.HOME })
+                    Pagina.KARAOKE -> Karaoke(onChiudi = { pagina = Pagina.HOME })
+                }
+            }
         }
+    }
+
+    /**
+     * La home fa una cosa sola: dice cosa sta suonando e ti fa cantare. Tutto il resto sta
+     * dietro una porta, perche' la configurazione si tocca una volta e il canto ogni giorno.
+     */
+    @Composable
+    private fun Home(onCanta: () -> Unit, onImpostazioni: () -> Unit) {
+        val playback by Engine.playback.collectAsStateWithLifecycle()
+
+        Box(Modifier.fillMaxSize()) {
+            SfondoDelBrano()
+
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .safeDrawingPadding()
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 20.dp, bottom = 28.dp),
+            ) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Squarciagola",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    TextButton(
+                        onClick = onImpostazioni,
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) { Text("Impostazioni") }
+                }
+
+                Spacer(Modifier.weight(1f))
+                Palco(playback, onCanta)
+                Spacer(Modifier.height(22.dp))
+                LineaAvanzamento()
+                Spacer(Modifier.weight(0.55f))
+            }
+        }
+    }
+
+    /**
+     * Una riga sottile con il punto del brano: si sa a che punto si e' senza dover aprire il
+     * karaoke. Si aggiorna due volte al secondo, non a ogni fotogramma: e' una barra, non
+     * un'animazione.
+     */
+    @Composable
+    private fun LineaAvanzamento() {
+        var frazione by remember { mutableStateOf(0f) }
+        var tempo by remember { mutableStateOf("") }
+        LaunchedEffect(Unit) {
+            while (true) {
+                val frame = Engine.currentFrame()
+                frazione = if (frame.durationMs > 0) {
+                    (frame.positionMs.toFloat() / frame.durationMs).coerceIn(0f, 1f)
+                } else {
+                    0f
+                }
+                tempo = if (frame.durationMs > 0) {
+                    "${orologio(frame.positionMs)} / ${orologio(frame.durationMs)}"
+                } else {
+                    ""
+                }
+                delay(500)
+            }
+        }
+        if (tempo.isEmpty()) return
+
+        LinearProgressIndicator(
+            progress = { frazione },
+            modifier = Modifier.fillMaxWidth().height(4.dp),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            gapSize = 0.dp,
+            drawStopIndicator = {},
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            tempo,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+
+    private fun orologio(ms: Long): String {
+        val totale = ms / 1000
+        return "%d:%02d".format(totale / 60, totale % 60)
     }
 
     @Composable
@@ -177,15 +302,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** Tutto quello che si tocca una volta e poi si dimentica. */
     @Composable
-    private fun Setup(onCanta: () -> Unit) {
-        val playback by Engine.playback.collectAsStateWithLifecycle()
+    private fun Impostazioni(onIndietro: () -> Unit) {
+        BackHandler(onBack = onIndietro)
         var esito by remember { mutableStateOf<String?>(null) }
         var aggiornamento by remember { mutableStateOf<Release?>(null) }
-
-        // Il servizio si avvia quando una delle due sorgenti ha attaccato: prima sarebbe una
-        // notifica persistente per un ascolto che non sta avvenendo.
         val origine by Engine.origine.collectAsStateWithLifecycle()
+
+        // Il servizio si avvia quando la sorgente ha attaccato: prima sarebbe una notifica
+        // persistente per un ascolto che non sta avvenendo.
         LaunchedEffect(origine) {
             if (origine.isNotEmpty()) PlaybackService.start(this@MainActivity)
         }
@@ -207,29 +333,30 @@ class MainActivity : ComponentActivity() {
                     .safeDrawingPadding()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 22.dp)
-                    .padding(top = 24.dp, bottom = 40.dp),
+                    .padding(top = 20.dp, bottom = 40.dp),
             ) {
-                Text(
-                    "Squarciagola",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-
-                Spacer(Modifier.height(24.dp))
-                Palco(playback, onCanta)
-
-                aggiornamento?.let {
-                    Spacer(Modifier.height(26.dp))
-                    AvvisoAggiornamento(it) { messaggio -> esito = messaggio }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Impostazioni",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    TextButton(
+                        onClick = onIndietro,
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) { Text("Fatto") }
                 }
 
-                Spacer(Modifier.height(46.dp))
-                Text(
-                    "Impostazioni",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(24.dp))
+
+                aggiornamento?.let {
+                    AvvisoAggiornamento(it) { messaggio -> esito = messaggio }
+                    Spacer(Modifier.height(26.dp))
+                }
 
                 Sezione("Spotify") { Connessione { messaggio -> esito = messaggio } }
                 Spacer(Modifier.height(26.dp))
