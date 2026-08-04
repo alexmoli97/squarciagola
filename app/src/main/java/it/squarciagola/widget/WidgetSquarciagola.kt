@@ -10,7 +10,6 @@ import android.os.Build
 import android.widget.RemoteViews
 import it.squarciagola.Engine
 import it.squarciagola.MainActivity
-import it.squarciagola.PlaybackService
 import it.squarciagola.R
 
 /**
@@ -27,11 +26,18 @@ import it.squarciagola.R
 class WidgetSquarciagola : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
-        // Il widget e' anche il modo piu' rapido per far ripartire l'ascolto dopo che il
-        // sistema ha ucciso il processo: se c'e' una sessione, si riaccende da solo.
+        // Niente avvio del servizio da qui: onUpdate gira in un BroadcastReceiver, e da
+        // Android 12 far partire un foreground service dal background lancia un'eccezione.
+        // Esplodendo prima del disegno, il launcher mostra soltanto "impossibile caricare il
+        // widget". L'ascolto lo avvia l'Activity, che il widget apre al tocco.
         Engine.init(context)
-        if (Engine.auth.isLoggedIn) PlaybackService.start(context)
-        ids.forEach { disegna(context, manager, it) }
+        ids.forEach { id ->
+            // Un widget che non si carica non dice perche': qualunque errore finisce nel log
+            // invece di lasciare un rettangolo grigio senza spiegazione.
+            runCatching { disegna(context, manager, id) }.onFailure {
+                android.util.Log.w("Squarciagola", "Widget non disegnato: ${it.message}", it)
+            }
+        }
     }
 
     override fun onEnabled(context: Context) {
@@ -63,7 +69,9 @@ class WidgetSquarciagola : AppWidgetProvider() {
         // Il colore della barra segue il brano, come ovunque nell'app. Prima di Android 12
         // RemoteViews non sa tingere una ProgressBar: resta quella di sistema.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            viste.setColorInt(R.id.avanzamento, "setProgressTintList", frame.accent, frame.accent)
+            runCatching {
+                viste.setColorInt(R.id.avanzamento, "setProgressTintList", frame.accent, frame.accent)
+            }
         }
 
         val copertina = Engine.copertina.value
