@@ -3,6 +3,7 @@ package it.squarciagola
 import android.content.Context
 import android.os.SystemClock
 import it.squarciagola.auth.SpotifyAuth
+import it.squarciagola.lyrics.LrcParser
 import it.squarciagola.lyrics.LrcLibSource
 import it.squarciagola.lyrics.LyricsRepository
 import it.squarciagola.model.KaraokeFrame
@@ -21,9 +22,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -150,6 +153,27 @@ object Engine {
                     .distinctUntilChanged()
                     .collect { loadLyricsForCurrentTrack(caricaCopertina = true) }
             }
+            launch { seguiRigaPerIlWidget() }
+        }
+    }
+
+    /**
+     * Tiene aggiornata la riga mostrata dal widget.
+     *
+     * Si controlla spesso ma si spedisce solo al cambio riga, che avviene ogni pochi secondi:
+     * un widget aggiornato a tempo sarebbe una sanguisuga di batteria, e il controllo in
+     * memoria e' una ricerca binaria su un centinaio di numeri. Quando non ci sono widget
+     * sulla schermata iniziale, l'invio non parte nemmeno.
+     */
+    private suspend fun seguiRigaPerIlWidget() {
+        var ultima: String? = null
+        while (currentCoroutineContext().isActive) {
+            val riga = rigaCorrente()
+            if (riga != ultima) {
+                ultima = riga
+                WidgetSquarciagola.aggiorna(appContext)
+            }
+            delay(400)
         }
     }
 
@@ -157,6 +181,23 @@ object Engine {
         running?.cancel()
         running = null
         _origine.value = ""
+    }
+
+    /**
+     * Testo della riga che si sta cantando adesso, vuoto se il brano non ha testo
+     * sincronizzato. Serve al widget, che non puo' disegnare ma sa mostrare una riga.
+     *
+     * Come nel karaoke, le pause strumentali (righe vuote nel file LRC) non diventano uno
+     * schermo vuoto: si resta sull'ultima riga cantata.
+     */
+    fun rigaCorrente(): String {
+        val testo = _lyrics.value as? Lyrics.Synced ?: return ""
+        val posizione = PositionClock.positionMs(
+            playback.value, SystemClock.elapsedRealtime(), offsetMs,
+        )
+        var indice = LrcParser.activeIndex(testo.lines, posizione)
+        while (indice >= 0 && testo.lines[indice].text.isBlank()) indice--
+        return if (indice in testo.lines.indices) testo.lines[indice].text else ""
     }
 
     /** Fotogramma corrente, pronto per il renderer. */

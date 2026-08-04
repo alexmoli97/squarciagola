@@ -191,13 +191,19 @@ In basso a destra nel karaoke c'è scritto da dove arriva il testo, e se è sinc
 
 ## Widget
 
-Sul telefono c'e' un widget per la schermata iniziale: copertina, brano, artista e barra di
-avanzamento, con il colore del brano come nel resto dell'app. Toccandolo si va **dritti al
-karaoke** invece che al menu, perche' il widget lo si tocca per cantare. Se il processo era
-stato ucciso dal sistema e c'e' una sessione Spotify valida, l'ascolto riparte da solo.
+Sul telefono c'e' un widget per la schermata iniziale: copertina, brano, artista e **la riga
+che si sta cantando adesso**, con il colore del brano come nel resto dell'app. Toccandolo si va
+dritti al karaoke invece che al menu, perche' il widget lo si tocca per cantare.
 
-Si aggiorna a ogni cambio di brano: il periodo minimo che Android concede da solo e' mezz'ora,
-inutile per un widget che deve dire cosa suona adesso.
+La riga si aggiorna al cambio riga e non a tempo. Il controllo avviene in memoria ogni frazione
+di secondo, ed e' una ricerca binaria su un centinaio di numeri, ma l'invio al widget parte solo
+quando la riga cambia davvero, cioe' ogni pochi secondi: aggiornare un widget a tempo sarebbe
+una sanguisuga di batteria. Senza widget sulla schermata iniziale l'invio non parte mai.
+
+Il receiver fa il meno possibile di proposito. Qualunque eccezione al suo interno arriva
+all'utente solo come "impossibile caricare il widget", senza una riga che spieghi cosa sia
+successo, quindi non inizializza nulla e legge i dati del brano soltanto se l'app e' gia' viva.
+Quando non lo e', il widget mostra il proprio nome e resta toccabile.
 
 **Su Android Auto i widget di terze parti non esistono.** La schermata iniziale mostra card
 controllate da Google e non c'e' API per aggiungerne, e vale anche per Android Automotive,

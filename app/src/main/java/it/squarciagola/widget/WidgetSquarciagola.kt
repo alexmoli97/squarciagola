@@ -54,13 +54,19 @@ class WidgetSquarciagola : AppWidgetProvider() {
         if (inAscolto) {
             viste.setTextViewText(R.id.titolo, frame.title)
             viste.setTextViewText(R.id.artista, frame.artist)
-            viste.setTextViewText(R.id.azione, context.getString(R.string.widget_canta))
-            viste.setTextColor(R.id.azione, frame.accent)
+            // Il karaoke ridotto all'osso: la riga che si sta cantando adesso. Senza testo
+            // sincronizzato resta l'invito ad aprire, che e' l'unica cosa utile da dire.
+            val riga = Engine.rigaCorrente()
+            viste.setTextViewText(
+                R.id.riga,
+                riga.ifEmpty { context.getString(R.string.widget_canta) },
+            )
+            viste.setTextColor(R.id.riga, frame.accent)
             copertina()?.let { viste.setImageViewBitmap(R.id.copertina, it) }
         } else {
             viste.setTextViewText(R.id.titolo, context.getString(R.string.app_name))
             viste.setTextViewText(R.id.artista, "Tocca per aprire")
-            viste.setTextViewText(R.id.azione, "")
+            viste.setTextViewText(R.id.riga, "")
             viste.setImageViewResource(R.id.copertina, R.drawable.ic_launcher)
         }
 
