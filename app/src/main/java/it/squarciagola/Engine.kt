@@ -112,6 +112,9 @@ object Engine {
     private var cachedOutputName = AudioOutput.DEFAULT
     private var outputCheckedAt = 0L
 
+    /** True quando l'app e' gia' viva: il widget lo usa per non inizializzare nulla da solo. */
+    val pronto: Boolean get() = ::appContext.isInitialized
+
     fun init(context: Context) {
         if (::appContext.isInitialized) return
         appContext = context.applicationContext

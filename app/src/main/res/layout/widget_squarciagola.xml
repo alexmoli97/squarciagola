@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Widget della schermata iniziale: copertina, brano, avanzamento.
-  RemoteViews e non Glance: il contenuto e' statico fra un aggiornamento e l'altro, e non
-  valeva una dipendenza in piu' per disegnare quattro elementi.
+  Layout deliberatamente povero: solo viste che le RemoteViews accettano da sempre e nessun
+  riferimento che debba risolversi nel tema del launcher. La barra di avanzamento e' stata
+  tolta: era il pezzo piu' a rischio e diceva la cosa meno importante.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/radice"
@@ -15,9 +15,10 @@
 
     <ImageView
         android:id="@+id/copertina"
-        android:layout_width="72dp"
-        android:layout_height="72dp"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
         android:scaleType="centerCrop"
+        android:src="@drawable/ic_launcher"
         android:contentDescription="@string/app_name" />
 
     <LinearLayout
@@ -33,6 +34,7 @@
             android:layout_height="wrap_content"
             android:maxLines="1"
             android:ellipsize="end"
+            android:text="@string/app_name"
             android:textColor="#FFE6E6EC"
             android:textSize="16sp"
             android:textStyle="bold" />
@@ -43,24 +45,18 @@
             android:layout_height="wrap_content"
             android:maxLines="1"
             android:ellipsize="end"
+            android:text="@string/widget_descrizione"
             android:textColor="#FFB0B0BC"
             android:textSize="13sp"
             android:layout_marginTop="2dp" />
-
-        <ProgressBar
-            android:id="@+id/avanzamento"
-            style="@android:style/Widget.ProgressBar.Horizontal"
-            android:layout_width="match_parent"
-            android:layout_height="4dp"
-            android:layout_marginTop="10dp"
-            android:max="1000" />
 
         <TextView
             android:id="@+id/azione"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="10dp"
             android:text="@string/widget_canta"
+            android:textColor="#FF7BE3A3"
             android:textSize="13sp"
             android:textStyle="bold" />
     </LinearLayout>

@@ -6,84 +6,65 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.os.Build
+import android.graphics.Bitmap
 import android.widget.RemoteViews
 import it.squarciagola.Engine
 import it.squarciagola.MainActivity
 import it.squarciagola.R
 
 /**
- * Widget della schermata iniziale del telefono: brano in riproduzione, copertina e punto del
- * pezzo, con un tocco che porta dritto al karaoke.
+ * Widget della schermata iniziale del telefono: brano in riproduzione, copertina e un tocco
+ * che porta dritto al karaoke.
  *
- * Su Android Auto non esiste nulla di equivalente: la schermata iniziale mostra card
- * controllate da Google e non c'e' API per aggiungerne di terze parti. Li' l'app resta
- * un'icona nel launcher, e questo widget non c'entra.
+ * Il receiver fa il meno possibile, e per una ragione precisa: qualunque eccezione qui dentro
+ * si manifesta al'utente soltanto come "impossibile caricare il widget", senza una riga che
+ * spieghi cosa sia successo. Quindi niente inizializzazioni pesanti, niente avvio di servizi
+ * (da Android 12 farlo dal background lancia un'eccezione), e i dati del brano si leggono solo
+ * se l'app e' gia' viva. Quando non lo e', il widget mostra il proprio nome e resta toccabile:
+ * un widget che invita ad aprire l'app e' comunque meglio di un rettangolo grigio.
  *
- * ponytail: RemoteViews e non Glance. Il contenuto e' fermo fra un aggiornamento e l'altro,
- * quattro elementi in croce, e Glance avrebbe portato una dipendenza per disegnarli.
+ * ponytail: RemoteViews e non Glance. Tre testi e un'immagine non giustificano una dipendenza.
  */
 class WidgetSquarciagola : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
-        // Niente avvio del servizio da qui: onUpdate gira in un BroadcastReceiver, e da
-        // Android 12 far partire un foreground service dal background lancia un'eccezione.
-        // Esplodendo prima del disegno, il launcher mostra soltanto "impossibile caricare il
-        // widget". L'ascolto lo avvia l'Activity, che il widget apre al tocco.
-        Engine.init(context)
         ids.forEach { id ->
-            // Un widget che non si carica non dice perche': qualunque errore finisce nel log
-            // invece di lasciare un rettangolo grigio senza spiegazione.
-            runCatching { disegna(context, manager, id) }.onFailure {
-                android.util.Log.w("Squarciagola", "Widget non disegnato: ${it.message}", it)
-            }
+            runCatching { manager.updateAppWidget(id, viste(context)) }
+                .onFailure {
+                    android.util.Log.w("Squarciagola", "Widget non disegnato: ${it.message}", it)
+                    // Ultima spiaggia: il layout cosi' com'e' nel file, senza dati.
+                    runCatching {
+                        manager.updateAppWidget(
+                            id,
+                            RemoteViews(context.packageName, R.layout.widget_squarciagola),
+                        )
+                    }
+                }
         }
     }
 
-    override fun onEnabled(context: Context) {
-        Engine.init(context)
-    }
-
-    private fun disegna(context: Context, manager: AppWidgetManager, id: Int) {
-        val frame = Engine.currentFrame()
+    private fun viste(context: Context): RemoteViews {
         val viste = RemoteViews(context.packageName, R.layout.widget_squarciagola)
 
-        val inAscolto = frame.title.isNotEmpty()
-        viste.setTextViewText(R.id.titolo, if (inAscolto) frame.title else "Silenzio in cabina")
-        viste.setTextViewText(
-            R.id.artista,
-            if (inAscolto) frame.artist else "Fai partire qualcosa su Spotify",
-        )
-        viste.setTextViewText(
-            R.id.azione,
-            if (inAscolto) context.getString(R.string.widget_canta) else "",
-        )
-        viste.setTextColor(R.id.azione, frame.accent)
+        // Solo se l'app e' gia' viva: inizializzare l'Engine da un receiver significherebbe
+        // creare preferenze cifrate e coroutine per disegnare tre righe di testo.
+        val frame = if (Engine.pronto) Engine.currentFrame() else null
+        val inAscolto = frame != null && frame.title.isNotEmpty()
 
-        val avanzamento = if (frame.durationMs > 0) {
-            ((frame.positionMs * 1000) / frame.durationMs).toInt().coerceIn(0, 1000)
+        if (inAscolto) {
+            viste.setTextViewText(R.id.titolo, frame.title)
+            viste.setTextViewText(R.id.artista, frame.artist)
+            viste.setTextViewText(R.id.azione, context.getString(R.string.widget_canta))
+            viste.setTextColor(R.id.azione, frame.accent)
+            copertina()?.let { viste.setImageViewBitmap(R.id.copertina, it) }
         } else {
-            0
-        }
-        viste.setProgressBar(R.id.avanzamento, 1000, avanzamento, false)
-        // Il colore della barra segue il brano, come ovunque nell'app. Prima di Android 12
-        // RemoteViews non sa tingere una ProgressBar: resta quella di sistema.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            runCatching {
-                viste.setColorInt(R.id.avanzamento, "setProgressTintList", frame.accent, frame.accent)
-            }
-        }
-
-        val copertina = Engine.copertina.value
-        if (copertina != null && !copertina.isRecycled) {
-            viste.setImageViewBitmap(R.id.copertina, copertina)
-        } else {
+            viste.setTextViewText(R.id.titolo, context.getString(R.string.app_name))
+            viste.setTextViewText(R.id.artista, "Tocca per aprire")
+            viste.setTextViewText(R.id.azione, "")
             viste.setImageViewResource(R.id.copertina, R.drawable.ic_launcher)
         }
 
         val apri = Intent(context, MainActivity::class.java).apply {
-            // Se c'e' un brano si va dritti al karaoke: il widget lo si tocca per cantare,
-            // non per aprire un menu.
             if (inAscolto) putExtra(MainActivity.EXTRA_APRI_KARAOKE, true)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -96,25 +77,44 @@ class WidgetSquarciagola : AppWidgetProvider() {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             ),
         )
+        return viste
+    }
 
-        manager.updateAppWidget(id, viste)
+    /**
+     * Copertina ridotta per il widget.
+     *
+     * Le immagini spedite a un widget viaggiano su una transazione Binder con un tetto di
+     * memoria calcolato sulla sua area: quella da 320 pixel di lato pesa quattrocento
+     * chilobyte e non e' una scommessa che vale la pena fare per un riquadro da 64.
+     */
+    private fun copertina(): Bitmap? {
+        val piena = Engine.copertina.value ?: return null
+        if (piena.isRecycled) return null
+        return runCatching { Bitmap.createScaledBitmap(piena, LATO, LATO, true) }.getOrNull()
     }
 
     companion object {
+        private const val LATO = 144
+
         /**
-         * Ridisegna tutti i widget presenti. La chiama l'Engine al cambio di brano: il
-         * periodo minimo che il sistema concede da solo e' mezz'ora, inutile per un widget
-         * che deve dire cosa sta suonando adesso.
+         * Ridisegna tutti i widget presenti. La chiama l'Engine al cambio di brano: il periodo
+         * minimo che il sistema concede da solo e' mezz'ora, inutile per un widget che deve
+         * dire cosa sta suonando adesso.
          */
         fun aggiorna(context: Context) {
-            val manager = AppWidgetManager.getInstance(context) ?: return
-            val ids = manager.getAppWidgetIds(ComponentName(context, WidgetSquarciagola::class.java))
-            if (ids.isEmpty()) return
-            val intento = Intent(context, WidgetSquarciagola::class.java).apply {
-                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+            runCatching {
+                val manager = AppWidgetManager.getInstance(context) ?: return
+                val ids = manager.getAppWidgetIds(
+                    ComponentName(context, WidgetSquarciagola::class.java)
+                )
+                if (ids.isEmpty()) return
+                context.sendBroadcast(
+                    Intent(context, WidgetSquarciagola::class.java).apply {
+                        action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+                    }
+                )
             }
-            context.sendBroadcast(intento)
         }
     }
 }
