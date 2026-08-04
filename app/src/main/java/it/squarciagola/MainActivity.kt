@@ -92,6 +92,12 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        /** Impostato dal widget per aprire direttamente il karaoke. */
+        const val EXTRA_APRI_KARAOKE = "apri_karaoke"
+    }
+
+
     /** Id del download in corso, per sapere quale notifica di completamento riguarda noi. */
     private var downloadId: Long = -1L
 
@@ -162,7 +168,13 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun Root() {
-        var pagina by remember { mutableStateOf(Pagina.HOME) }
+        // Toccando il widget si vuole cantare, non aprire un menu: si entra dritti nel karaoke.
+        var pagina by remember {
+            mutableStateOf(
+                if (intent?.getBooleanExtra(EXTRA_APRI_KARAOKE, false) == true) Pagina.KARAOKE
+                else Pagina.HOME
+            )
+        }
         val animazioni = animazioniAttive()
 
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {

@@ -13,6 +13,7 @@ import it.squarciagola.playback.PlaybackPoller
 import it.squarciagola.playback.PositionClock
 import it.squarciagola.render.AlbumArt
 import it.squarciagola.ui.Accento
+import it.squarciagola.widget.WidgetSquarciagola
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -201,6 +202,9 @@ object Engine {
             return
         }
         _lyrics.value = Lyrics.Loading
+        // Il widget deve dire cosa suona adesso: il periodo minimo che il sistema concede da
+        // solo e' mezz'ora, quindi lo si sveglia al cambio di brano.
+        WidgetSquarciagola.aggiorna(appContext)
         // La copertina non blocca il testo: arriva quando arriva, e finche' manca lo sfondo
         // resta quello scuro di sempre.
         if (caricaCopertina) {
@@ -209,6 +213,7 @@ object Engine {
                 _artwork.value = sfondo?.immagine
                 _copertina.value = sfondo?.nitida
                 _accento.value = sfondo?.accento ?: Accento.PREDEFINITO
+                WidgetSquarciagola.aggiorna(appContext)
             }
         }
         _lyrics.value = withContext(Dispatchers.IO) { repository.load(track) }

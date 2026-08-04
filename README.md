@@ -189,6 +189,20 @@ delle animazioni.
 
 In basso a destra nel karaoke c'è scritto da dove arriva il testo, e se è sincronizzato o no.
 
+## Widget
+
+Sul telefono c'e' un widget per la schermata iniziale: copertina, brano, artista e barra di
+avanzamento, con il colore del brano come nel resto dell'app. Toccandolo si va **dritti al
+karaoke** invece che al menu, perche' il widget lo si tocca per cantare. Se il processo era
+stato ucciso dal sistema e c'e' una sessione Spotify valida, l'ascolto riparte da solo.
+
+Si aggiorna a ogni cambio di brano: il periodo minimo che Android concede da solo e' mezz'ora,
+inutile per un widget che deve dire cosa suona adesso.
+
+**Su Android Auto i widget di terze parti non esistono.** La schermata iniziale mostra card
+controllate da Google e non c'e' API per aggiungerne, e vale anche per Android Automotive,
+quello integrato nelle auto. Li' l'app resta un'icona nel launcher.
+
 ## Aggiornamenti senza store
 
 L'app si aggiorna da sola dalle release di GitHub. Non c'è server, non c'è manifest da
@@ -250,6 +264,7 @@ non si pone.
 | `render/TextWrapper.kt` | Righe lunghe mandate a capo. Testato senza framework grafico |
 | `render/AlbumArt.kt` | Copertina sfocata con media mobile, sfondo del testo |
 | `ui/Accento.kt` | Colore dominante della copertina, riportato in leggibilità. Testato |
+| `widget/WidgetSquarciagola.kt` | Widget della schermata iniziale del telefono |
 | `update/UpdateChecker.kt` | Legge l'ultima release da GitHub. Testato |
 | `update/Updater.kt` | Download e avvio dell'installer di sistema |
 | `render/KaraokeView.kt` | Contenitore per il telefono |

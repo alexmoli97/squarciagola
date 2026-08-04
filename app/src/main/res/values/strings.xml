@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Squarciagola</string>
+    <string name="widget_canta">Canta a squarciagola</string>
+    <string name="widget_descrizione">Il brano in riproduzione e il testo a portata di tocco</string>
 </resources>
