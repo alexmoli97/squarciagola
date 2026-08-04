@@ -23,6 +23,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,7 +62,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
@@ -211,13 +218,20 @@ class MainActivity : ComponentActivity() {
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalAlignment = Alignment.Top,
                 ) {
-                    Text(
-                        "Squarciagola",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                    Column {
+                        Text(
+                            "Squarciagola",
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            "L'intonazione è affar tuo",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     TextButton(
                         onClick = onImpostazioni,
                         modifier = Modifier.heightIn(min = 48.dp),
@@ -225,10 +239,62 @@ class MainActivity : ComponentActivity() {
                 }
 
                 Spacer(Modifier.weight(1f))
+                Copertina()
+                Spacer(Modifier.height(26.dp))
                 Palco(playback, onCanta)
-                Spacer(Modifier.height(22.dp))
+                Spacer(Modifier.height(20.dp))
                 LineaAvanzamento()
-                Spacer(Modifier.weight(0.55f))
+                Spacer(Modifier.weight(0.35f))            }
+        }
+    }
+
+    /**
+     * La copertina del disco, a fuoco e in grande.
+     *
+     * Riempie la pagina con qualcosa di vero invece che con ornamenti, e l'alone attorno
+     * prende il colore del brano, cosi' anche da fermi si capisce da dove viene la tinta di
+     * tutta l'interfaccia.
+     */
+    @Composable
+    private fun ColumnScope.Copertina() {
+        val copertina by Engine.copertina.collectAsStateWithLifecycle()
+
+        AnimatedContent(
+            targetState = copertina,
+            transitionSpec = { fadeIn(tween(400)) togetherWith fadeOut(tween(260)) },
+            label = "copertina",
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        ) { immagine ->
+            Box(
+                Modifier
+                    .fillMaxWidth(0.66f)
+                    .aspectRatio(1f)
+                    .shadow(
+                        elevation = 30.dp,
+                        shape = MaterialTheme.shapes.large,
+                        ambientColor = MaterialTheme.colorScheme.primary,
+                        spotColor = MaterialTheme.colorScheme.primary,
+                    )
+                    .clip(MaterialTheme.shapes.large)
+                    .background(MaterialTheme.colorScheme.surfaceContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (immagine != null && !immagine.isRecycled) {
+                    Image(
+                        bitmap = immagine.asImageBitmap(),
+                        contentDescription = "Copertina dell'album",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    // Senza copertina resta la sagoma: la pagina non cambia forma quando il
+                    // brano cambia, e non si vede saltare tutto il resto.
+                    Text(
+                        "♪",
+                        style = MaterialTheme.typography.displayLarge,
+                        color = MaterialTheme.colorScheme.outline,
+                    )
+                }
             }
         }
     }

@@ -146,8 +146,12 @@ Tema scuro unico, per la schermata e per il karaoke. Non è una preferenza estet
 si guarda al buio, in macchina di sera o col telefono nel supporto, e uno schermo chiaro in
 quelle condizioni acceca.
 
-Due pagine distinte. La **home** fa una cosa sola: dice cosa sta suonando, in grande, e ti fa
-cantare; sotto una riga sottile con il punto del brano, per saperlo senza aprire il karaoke.
+Due pagine distinte. La **home** porta il nome dell'app, la copertina del disco a fuoco e in
+grande, il brano in riproduzione e il pulsante per cantarlo, con sotto una riga sottile per
+sapere a che punto sei senza aprire il karaoke. La copertina riempie la pagina con qualcosa di
+vero invece che con ornamenti, e l'alone attorno prende il colore del brano: anche da fermi si
+capisce da dove viene la tinta di tutta l'interfaccia. Senza copertina resta la sagoma, cosi'
+la pagina non cambia forma al cambio di brano.
 Le **impostazioni** stanno dietro una porta, perche' la configurazione si tocca una volta e il
 canto ogni giorno. Il passaggio fra le due scorre lungo un asse orizzontale, a destra entrando
 e a sinistra tornando, cosi' il movimento dice dove sei finito.

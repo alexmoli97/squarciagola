@@ -56,6 +56,10 @@ object Engine {
     /** La copertina sfocata, usata come sfondo sia dal karaoke sia dalla schermata. */
     val artwork: StateFlow<android.graphics.Bitmap?> = _artwork.asStateFlow()
 
+    /** La copertina a fuoco, mostrata in home. */
+    private val _copertina = MutableStateFlow<android.graphics.Bitmap?>(null)
+    val copertina: StateFlow<android.graphics.Bitmap?> = _copertina.asStateFlow()
+
     /** Colore dettato dalla copertina del brano, o il menta di sempre quando non c'e'. */
     private val _accento = MutableStateFlow(Accento.PREDEFINITO)
     val accento: StateFlow<Int> = _accento.asStateFlow()
@@ -191,6 +195,7 @@ object Engine {
             _lyrics.value = Lyrics.None
             if (caricaCopertina) {
                 _artwork.value = null
+                _copertina.value = null
                 _accento.value = Accento.PREDEFINITO
             }
             return
@@ -202,6 +207,7 @@ object Engine {
             scope.launch(Dispatchers.IO) {
                 val sfondo = track.artworkUrl.takeIf { it.isNotEmpty() }?.let { AlbumArt.load(it) }
                 _artwork.value = sfondo?.immagine
+                _copertina.value = sfondo?.nitida
                 _accento.value = sfondo?.accento ?: Accento.PREDEFINITO
             }
         }

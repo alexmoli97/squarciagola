@@ -19,13 +19,19 @@ import it.squarciagola.ui.Accento
  * Tre passate di box blur approssimano una gaussiana abbastanza bene, e il costo si paga una
  * volta per brano su un thread di I/O, non nel ciclo di disegno.
  */
-/** Sfondo pronto: l'immagine sfocata e il colore che il brano detta all'interfaccia. */
-data class Sfondo(val immagine: Bitmap, val accento: Int)
+/**
+ * Tutto quello che la copertina ci da': la versione sfocata per lo sfondo, quella nitida da
+ * mostrare in home, e il colore che il brano detta all'interfaccia.
+ */
+data class Sfondo(val immagine: Bitmap, val accento: Int, val nitida: Bitmap)
 
 object AlbumArt {
 
     /** Lato dell'immagine su cui si sfoca. Piu' alto, piu' dettaglio e piu' lavoro. */
     private const val LATO = 160
+
+    /** Lato della copertina mostrata a fuoco in home. */
+    private const val LATO_NITIDA = 320
 
     /** Raggio della media mobile, in pixel dell'immagine ridotta. */
     private const val RAGGIO = 6
@@ -44,34 +50,18 @@ object AlbumArt {
         val originale = runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
             .getOrNull() ?: return null
 
+        val nitida = runCatching { Bitmap.createScaledBitmap(originale, LATO_NITIDA, LATO_NITIDA, true) }
+            .getOrNull() ?: return null
         val ridotta = runCatching { Bitmap.createScaledBitmap(originale, LATO, LATO, true) }
             .getOrNull()
-        if (ridotta !== originale) originale.recycle()
+        if (originale !== nitida && originale !== ridotta) originale.recycle()
         if (ridotta == null) return null
 
         val sfocata = runCatching { blur(ridotta) }.getOrNull() ?: ridotta
         if (sfocata !== ridotta) ridotta.recycle()
 
         urlInCache = url
-        bitmapInCache = Sfondo(sfocata, accentoDi(sfocata))
-        return bitmapInCache
-    }
-
-    /**
-     * Sfoca una copertina gia' disponibile come Bitmap, come quella che consegna App Remote.
-     * La chiave serve solo a non rifare il lavoro sullo stesso brano.
-     */
-    @Synchronized
-    fun blurred(chiave: String, source: Bitmap): Sfondo? {
-        if (chiave == urlInCache) return bitmapInCache
-
-        val ridotta = runCatching { Bitmap.createScaledBitmap(source, LATO, LATO, true) }
-            .getOrNull() ?: return null
-        val sfocata = runCatching { blur(ridotta) }.getOrNull() ?: ridotta
-        if (sfocata !== ridotta && ridotta !== source) ridotta.recycle()
-
-        urlInCache = chiave
-        bitmapInCache = Sfondo(sfocata, accentoDi(sfocata))
+        bitmapInCache = Sfondo(sfocata, accentoDi(sfocata), nitida)
         return bitmapInCache
     }
 
